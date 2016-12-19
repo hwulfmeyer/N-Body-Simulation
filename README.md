@@ -8,7 +8,7 @@ The classical N-body problem simulates the evolution of a system of N bodies, wh
 Infomaterial:
 * http://www.cs.cmu.edu/~scandal/alg/nbody.html
 * http://physics.princeton.edu/~fpretori/Nbody/intro.htm
-
+* http://www.cs.princeton.edu/courses/archive/spr15/cos126/assignments/nbody.html
 
 
 ### The Algorithm
@@ -24,14 +24,15 @@ Pseudocode calculating force:
       for each Body k where k!=i {
         vec3 direction = k.position - i.position;
         double dist = norm(direction);  // L^2-Norm
-        i.force += (G * a.mass * b.mass * d) / (distSqr*distSqr*distSqr);
+        i.force += (G * a.mass * b.mass / dist^3) * direction;
       }
     }
-
+G = gravitational constant
 
 Updating position & velocity:
-
-    for each Body i for time dt{    
+    
+    dt = timespan
+    for each Body i {    
       i.velocity += dt * i.force / i.mass;
       i.position += dt * i.velocity;
     }
