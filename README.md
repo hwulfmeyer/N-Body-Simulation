@@ -1,5 +1,7 @@
 # N-Body Simulation
 
+For parallel computing on CPU & CUDA.
+
 ### Simulation Setup
 
 The classical N-body problem simulates the evolution of a system of N bodies, where the force exerted on each body arises due to its interaction with all the other bodies in the system.
@@ -18,8 +20,9 @@ The naive implementation calculates each force for each object from all objects.
 See https://en.wikipedia.org/wiki/N-body_problem#General_formulation
 
 
-Pseudocode calculating force:
+Pseudocode calculating netforce for each body:
 
+    G = gravitational constant;
     for each Body i {    
       for each Body k where k!=i {
         vec3 direction = k.position - i.position;
@@ -27,11 +30,10 @@ Pseudocode calculating force:
         i.force += (G * k.mass * i.mass / dist^3) * direction;
       }
     }
-G = gravitational constant
 
-Updating position & velocity:
+Updating position & velocity for each body:
     
-    dt = timespan
+    dt = timespan;
     for each Body i {    
       i.velocity += dt * i.force / i.mass;
       i.position += dt * i.velocity;
