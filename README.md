@@ -13,7 +13,7 @@ Infomaterial:
 
 ### The Algorithm:
 
-The naive implementation would simply calculate each force for each object also called all-pairs-agorithm.
+The naive implementation would calculate each force for each object from all objects. It's called all-pairs-agorithm or brute force method, it gives the most correct results.
 
 
 ### Algorithm Optimization:
