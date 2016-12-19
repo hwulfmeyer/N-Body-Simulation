@@ -39,9 +39,19 @@ Updating position & velocity for each body:
       i.position += dt * i.velocity;
     }
 
+### Implementation
+
+Drawing is done with OpenGL.
+
+Libraries (https://www.opengl.org/wiki/Related_toolkits_and_APIs):
+* http://www.glfw.org (more for games & stuff)
+* https://www.qt.io/developers/ 
 
 ### Algorithm Optimization
 
 __TODO__
 https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation
+
+
+
 
