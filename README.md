@@ -8,6 +8,7 @@ The classical N-body problem simulates the evolution of a system of N bodies, wh
 
 
 Infomaterial:
+* http://http.developer.nvidia.com/GPUGems3/gpugems3_ch31.html
 * http://www.cs.cmu.edu/~scandal/alg/nbody.html
 * http://physics.princeton.edu/~fpretori/Nbody/intro.htm
 * http://www.cs.princeton.edu/courses/archive/spr15/cos126/assignments/nbody.html
@@ -38,6 +39,25 @@ Updating position & velocity for each body:
       i.velocity += dt * i.force / i.mass;
       i.position += dt * i.velocity;
     }
+
+With softening factor & simplification:
+
+    G = gravitational constant;
+    epsilon = softening factor;     // epsilon^2 > 0
+    for each Body i {
+      i.velocity = (0,0,0);
+      for each Body k {
+        vec3 direction = k.position - i.position;
+        double dist = norm2(direction);  // L^2-Norm without root
+        i.velocity += k.mass*direction  / (dist + epsilon^2)^(3/2);
+      }
+      i.velocity = G * i.velocity;
+    }
+    dt = timespan;
+    for each Body i {
+      i.position += dt * i.velocity;
+    }
+
 
 ### Implementation
 
