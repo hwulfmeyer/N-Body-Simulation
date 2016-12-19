@@ -24,7 +24,7 @@ Pseudocode calculating force:
       for each Body k where k!=i {
         vec3 direction = k.position - i.position;
         double dist = norm(direction);  // L^2-Norm
-        i.force += (G * a.mass * b.mass / dist^3) * direction;
+        i.force += (G * k.mass * i.mass / dist^3) * direction;
       }
     }
 G = gravitational constant
