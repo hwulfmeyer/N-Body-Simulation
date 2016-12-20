@@ -18,7 +18,7 @@ class Body {
 public:
 
 	Body(float m, vec3 p, vec3 v);
-	~Body();
+	~Body() { };
 
 	void addForceVelocity(Body p);
 	void updatePosition(float dt);
