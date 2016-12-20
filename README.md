@@ -48,7 +48,7 @@ With softening factor & simplification:
       i.velocity = (0,0,0);
       for each Body k {
         vec3 direction = k.position - i.position;
-        double dist = norm2(direction);  // L^2-Norm without root
+        double dist = norm2(direction);  // dot product (l2 norm squared)
         i.velocity += k.mass*direction  / (dist + epsilon^2)^(3/2);
       }
       i.velocity = G * i.velocity;
