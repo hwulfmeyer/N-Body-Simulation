@@ -23,8 +23,8 @@ Body::Body(float m, vec3 p, vec3 v) :
 void 
 Body::addForceVelocity(Body k) {
 	vec3 dir = this->position - k.position;
-	float dist = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z;  // L^2-Norm without root
-	this->velocity += dir * k.mass / (dist + EPS*EPS);
+	float dist = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z;  // L^2-Norm without root ie. dot product
+	this->velocity += dir * k.mass / pow(dist + EPS*EPS, 2/3);
 }
 
 
