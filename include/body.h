@@ -11,7 +11,7 @@
 using namespace glm;
 
 static const float G = 6.67408e-11;	// gravitational constant
-static float EPS = 3e4;
+static float EPS = 2e2;
 
 class Body {
 
