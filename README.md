@@ -63,10 +63,7 @@ With softening factor & simplification:
 
 Drawing is done with OpenGL.
 
-Libraries (https://www.opengl.org/wiki/Related_toolkits_and_APIs):
-* http://www.glfw.org (more for games & stuff)
-* http://www.sfml-dev.org
-* https://www.qt.io/developers/ 
+Libraries (https://www.opengl.org/wiki/Related_toolkits_and_APIs)
 
 ### Algorithm Optimization
 
