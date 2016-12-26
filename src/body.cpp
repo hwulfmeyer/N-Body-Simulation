@@ -6,14 +6,17 @@
 
 #include "body.h"
 
+static const float G = 6.67408e-11;	// gravitational constant
+static float EPS = 4e1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // user constructor
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-Body::Body(float m, vec3 p, vec3 v) : 
+Body::Body(float m, vec3 p, vec3 v, bool im) : 
 	mass(m), 
 	position(p), 
-	velocity(p) 
+	velocity(v),
+	isMoveable(im)
 { }
 
 
@@ -21,10 +24,10 @@ Body::Body(float m, vec3 p, vec3 v) :
 // adds the force from body k as velocity to the body
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void 
-Body::addForceVelocity(Body k) {
-	vec3 dir = this->position - k.position;
+Body::bodyInteraction(Body &othBody) {
+	vec3 dir = othBody.position - this->position;
 	float dist = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z;  // L^2-Norm without root ie. dot product
-	this->velocity += dir * k.mass / pow(dist + EPS*EPS, 2/3);
+	this->velocity += dir * othBody.mass / sqrt(pow(dist + EPS*EPS,3));
 }
 
 
@@ -33,6 +36,5 @@ Body::addForceVelocity(Body k) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Body::updatePosition(float dt) {
-	this->position += dt * this->velocity * G;
-	this->velocity = vec3(0, 0, 0);
+	if(isMoveable) this->position += dt * this->velocity * G;
 }
