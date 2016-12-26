@@ -13,7 +13,7 @@
 
 unsigned static const int winWidth = 1280;
 unsigned static const int winHeight = 768;
-unsigned static const int numOneSideParticles = 6;
+unsigned static const int numOneSideParticles = 7;
 
 int
 main()
@@ -21,7 +21,7 @@ main()
 	// vector for our bodies
 	std::vector<Body> bodies;
 	// zoom factor
-	float zoomFactor = 0.2;
+	float zoomFactor = 0.1;
 	// time between frames
 	float dt = 0;
 	// clock for time keeping
@@ -46,13 +46,25 @@ main()
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
 				float distance = 130;
-				Body curBody(2e10, vec3(x * distance + z*50, y * distance + z * 50, z * distance) + vec3(100, 100, 0), vec3(2e14, 0, 0), true);
+				Body curBody(2e10, vec3(x * distance, y * distance, z * distance) + vec3(100, 100, 0), vec3(2e14, 0, 0), true);
 				bodies.push_back(curBody);
 			}
 		}
 	}
 
-	Body starBody(3e18, vec3(numOneSideParticles * 130, winHeight*2.5, numOneSideParticles/2 * 130), vec3(0, 0, 0), true);
+	for (int x = 0; x < numOneSideParticles; ++x) {
+		for (int y = 0; y < numOneSideParticles; ++y) {
+			for (int z = 0; z < numOneSideParticles; ++z) {
+				float distance = 130;
+				Body curBody(2e10, vec3(x * distance + numOneSideParticles * 130, y * distance + 1920 + 1920-numOneSideParticles*130, -z * distance) + vec3(100, 100, 0), vec3(-2e14, 0, 0), true);
+				bodies.push_back(curBody);
+			}
+		}
+	}
+
+
+
+	Body starBody(3e18, vec3(numOneSideParticles * 130, 1920, 0), vec3(0, 0, 0), true);
 	bodies.push_back(starBody);
 
 
@@ -107,7 +119,7 @@ main()
 		glPushMatrix();
 
 
-		glTranslatef(winWidth / 3, winHeight / 10, 0);
+		glTranslatef(winWidth / 3, winHeight / 4, 0);
 		glScalef(zoomFactor, zoomFactor, 0);
 
 
