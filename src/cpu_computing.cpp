@@ -85,6 +85,8 @@ Cpu_Computing::computeTile(const int tid, const int &num_threads, float dt){
 
 	// cache for later writing
 	glm::vec3 *vel_cache = new glm::vec3[i_end - i_start];
+	// cache for position so we can overwrite them in other threads
+	std::vector<glm::vec3> pos_copy = positions;
 
 	glm::vec3 dir;
 
@@ -92,26 +94,30 @@ Cpu_Computing::computeTile(const int tid, const int &num_threads, float dt){
 	{
 		for (unsigned int k = 0; k < size; ++k)
 		{
-			dir.x = positions[k][0] - positions[i][0];
-			dir.y = positions[k][1] - positions[i][1];
-			dir.z = positions[k][2] - positions[i][2];
+			dir = pos_copy[k] - pos_copy[i];
 			float distSqr = dir.x*dir.x+ dir.y*dir.y+ dir.z*dir.z + EPS2;
 
 			float partForce = masses[k] / sqrt(distSqr*distSqr*distSqr);
-			vel_cache[i - i_start] = dir * partForce;
+			vel_cache[i - i_start] += dir * partForce;
 		}
 	}
-	
+
+	// critical section
 	// writing tile to velocities and then to positions
 	mutexTiles.lock();
 	for (unsigned int i = i_start; i < i_end; ++i)
 	{
 		velocities[i] += vel_cache[i - i_start];
-		positions[i][0] += dt * velocities[i].x * G;
-		positions[i][1] += dt * velocities[i].y * G;
-		positions[i][2] += dt * velocities[i].z * G;
 	}
 	mutexTiles.unlock();
+	
+	mutexTiles.lock();
+	for (unsigned int i = i_start; i < i_end; ++i)
+	{
+		positions[i] += dt * velocities[i] * G;
+	}
+	mutexTiles.unlock();
+
 
 	delete[] vel_cache;
 }

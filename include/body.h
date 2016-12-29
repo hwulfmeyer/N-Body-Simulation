@@ -5,8 +5,8 @@
 
 #include "glm/glm.hpp"
 
-static const float G = 6.67408e-11;	// gravitational constant
-static const float EPS = 4e1;
+static const float G = 6.67408e-11f;	// gravitational constant
+static const float EPS = 3e1;
 static const float EPS2 = EPS*EPS;
 
 class Body {

@@ -1,5 +1,9 @@
 
 
+
+#define _USE_MATH_DEFINES
+#define CPUPARALLEL
+
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
 #include "body.h"
@@ -8,13 +12,20 @@
 #include <string>
 #include <math.h>
 
-#define CPUPARALLEL
+void
+testGalaxy(std::vector<Body> &bodies);
 
 void
 starGalaxy1(std::vector<Body> &bodies);
 
 void
 starGalaxy2(std::vector<Body> &bodies);
+
+void
+starGalaxy3(std::vector<Body> &bodies);
+
+void
+starGalaxy4(std::vector<Body> &bodies);
 
 int
 main()
@@ -25,11 +36,12 @@ main()
 	// get size
 	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
 	std::vector<Body> bodies;
-	starGalaxy2(bodies);
+	// GALAXY
+	starGalaxy4(bodies);
 	//computing for cpu
 #ifdef CPUPARALLEL
 	Cpu_Computing cpu_computer(bodies);
-	cpu_computer.setThreads(4);
+	cpu_computer.setThreads();
 
 	const float *positions = cpu_computer.getPositions();
 	const size_t sizeBodies = cpu_computer.getSize();
@@ -37,9 +49,14 @@ main()
 	// array of colors
 	unsigned char *vertexColors = new unsigned char[3 * sizeBodies];
 	// zoom factor
-	float zoomFactor = 0.1;
+	float zoomFactor = 0.05f;
 	// time between frames
 	float dt = 0;
+	// translation
+	float xTranslation = 10;
+	float yTranslation = 10;
+	
+	/// After this SFML stuff
 	// clock for time keeping
 	sf::Clock elapsedTime;
 
@@ -67,10 +84,27 @@ main()
 		}
 
 		//zooming
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-			zoomFactor += dt * zoomFactor;
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-			zoomFactor -= dt * zoomFactor;
+		if (window.hasFocus()) {
+			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+				zoomFactor += dt * zoomFactor;
+			if (sf::Mouse::isButtonPressed(sf::Mouse::Right))
+				zoomFactor -= dt * zoomFactor;
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
+				yTranslation += dt * 200;
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+				yTranslation -= dt * 200;
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+				xTranslation += dt * 200;
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+				xTranslation -= dt * 200;
+			/*
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
+			glRotatef(100 * dt * zoomFactor, 0, 1, 0);
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::E))
+			glRotatef(-100 * dt * zoomFactor, 0, 1, 0);
+			*/
+		}
+
 
 		// clear the screen buffer
 		glClearColor(0.1, 0.1, 0.1, 0.1);
@@ -78,8 +112,8 @@ main()
 
 		glPushMatrix();
 
-		glTranslatef(winWidth / 3, winHeight / 4, 0);
-		glScalef(zoomFactor, zoomFactor, 0);
+		glTranslatef(xTranslation, yTranslation, 0);
+		glScalef(zoomFactor, zoomFactor, zoomFactor);
 
 		glEnableClientState(GL_VERTEX_ARRAY);
 
@@ -107,61 +141,122 @@ main()
 	return 0;
 }
 
+
 void
-starGalaxy1(std::vector<Body> &bodies)
+testGalaxy(std::vector<Body> &bodies)
 {
 	unsigned const int numOneSideParticles = 7;
 
+	Body starBody(0, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	bodies.push_back(starBody);
+	float distance = 300;
 	// fill vector body with bodies
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				float distance = 130;
-				Body curBody(2e10, glm::vec3(x * distance, y * distance, z * distance) + glm::vec3(100, 100, 0), glm::vec3(2e14, 0, 0));
-				bodies.push_back(curBody);
+				Body curBody1(0, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				bodies.push_back(curBody1);
+				Body curBody2(0, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				bodies.push_back(curBody2);
 			}
 		}
 	}
-
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				float distance = 130;
-				Body curBody(2e10, glm::vec3(x * distance + numOneSideParticles * 130, y * distance + 1920 + 1920 - numOneSideParticles * 130, -z * distance) + glm::vec3(100, 100, 0), glm::vec3(-2e14, 0, 0));
-				bodies.push_back(curBody);
-			}
-		}
-	}
-
-	Body starBody(3e18, glm::vec3(numOneSideParticles * 130, 1920, 0), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
 }
 
-void starGalaxy2(std::vector<Body>& bodies)
+
+void
+starGalaxy1(std::vector<Body> &bodies)
 {
-	unsigned const int numOneSideParticles = 6;
+	unsigned const int numOneSideParticles = 10;
 
+	Body starBody(9e18, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	bodies.push_back(starBody);
+	float distance = 300;
 	// fill vector body with bodies
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				float distance = 130;
-				Body curBody(2e10, glm::vec3(x * distance, y * distance, z * distance) + glm::vec3(100, 100, 0), glm::vec3(2e14, 0, 0));
-				bodies.push_back(curBody);
+				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				bodies.push_back(curBody1);
+				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				bodies.push_back(curBody2);
 			}
 		}
 	}
+}
 
+void 
+starGalaxy2(std::vector<Body>& bodies)
+{
+	unsigned const int numOneSideParticles = 10;
+
+	Body starBody(1.2e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	bodies.push_back(starBody);
+	float distance = 300;
+	// fill vector body with bodies
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				float distance = 130;
-				Body curBody(2e10, glm::vec3(x * distance + numOneSideParticles * 130, y * distance + 1920 + 1920 - numOneSideParticles * 130, z * distance) + glm::vec3(100, 100, 0), glm::vec3(-2e14, 0, 0));
-				bodies.push_back(curBody);
+				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				bodies.push_back(curBody1);
+				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				bodies.push_back(curBody2);
+				Body curBody3(2e10, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, -2e14, 0));
+				bodies.push_back(curBody3);
+				Body curBody4(2e10, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 2e14, 0));
+				bodies.push_back(curBody4);
+			}
+		}
+	}
+}
+
+void 
+starGalaxy3(std::vector<Body>& bodies)
+{
+	unsigned const int numOneSideParticles = 10;
+
+	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	bodies.push_back(starBody);
+	float distance = 300;
+	// fill vector body with bodies
+	for (int x = 0; x < numOneSideParticles; ++x) {
+		for (int y = 0; y < numOneSideParticles; ++y) {
+			for (int z = 0; z < numOneSideParticles; ++z) {
+				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				bodies.push_back(curBody1);
+				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				bodies.push_back(curBody2);
+				Body curBody3(2e10, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, -2e14, 0));
+				bodies.push_back(curBody3);
+				Body curBody4(2e10, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 2e14, 0));
+				bodies.push_back(curBody4);
 			}
 		}
 	}
 
-	Body starBody(3e18, glm::vec3(numOneSideParticles * 130, 1920, 0), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
+
 }
+
+void starGalaxy4(std::vector<Body>& bodies)
+{
+
+	int radius = 2e5;
+	float angle = 0.0;
+	float angle_stepsize = 0.075;
+	int bodies_per_angle = 25;
+
+	// go through all angles from 0 to 2 * PI radians
+	while (angle < 2 * M_PI)
+	{
+		// calculate x, y from a vector with known length and angle
+		int x = radius * cos(angle);
+		int y = radius * sin(angle);
+
+		for (int i = 1; i <= bodies_per_angle; ++i) {
+			Body body(2e16, glm::vec3(x*i/70, y*i/70, 0), glm::vec3(0, 0, 0));
+			bodies.push_back(body);
+		}
+		angle += angle_stepsize;
+	}
+}
+
