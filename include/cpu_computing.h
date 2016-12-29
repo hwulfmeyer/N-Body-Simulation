@@ -14,12 +14,12 @@
 class Cpu_Computing {
 public:
 
+	//constructor
 	Cpu_Computing(std::vector<Body> &bodies);
 
-	~Cpu_Computing() { 
-		delete[] masses;
-		delete[] velocities;
-	};
+	//destructor
+	~Cpu_Computing();
+
 
 	void setThreads();
 
@@ -53,6 +53,7 @@ private:
 
 private:
 
+	//def constructor
 	Cpu_Computing();
 
 
