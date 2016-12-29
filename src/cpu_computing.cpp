@@ -62,9 +62,10 @@ void
 Cpu_Computing::compute(float dt) {
 
 	// spawn threads
+	float dtG = dt * G;
 	std::vector<std::thread> threads;
 	for (unsigned int i = 0; i < numThreads; ++i) {
-			threads.push_back(std::thread(&Cpu_Computing::computeTile, this, i, std::ref(numThreads), dt));
+			threads.push_back(std::thread(&Cpu_Computing::computeTile, this, i, std::ref(numThreads), dtG));
 		
 	}
 
@@ -78,7 +79,7 @@ Cpu_Computing::compute(float dt) {
 // computes one tile for n-body
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-Cpu_Computing::computeTile(const int tid, const int &num_threads, float dt){
+Cpu_Computing::computeTile(const int tid, const int &num_threads, float dtG){
 	// calc start & end for i
 	const unsigned int i_start = float(size) / num_threads * tid;
 	const unsigned int i_end = float(size) / num_threads * (tid + 1);
@@ -114,7 +115,7 @@ Cpu_Computing::computeTile(const int tid, const int &num_threads, float dt){
 	mutexTiles.lock();
 	for (unsigned int i = i_start; i < i_end; ++i)
 	{
-		positions[i] += dt * velocities[i] * G;
+		positions[i] += dtG * velocities[i];
 	}
 	mutexTiles.unlock();
 

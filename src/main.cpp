@@ -37,7 +37,7 @@ main()
 	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
 	std::vector<Body> bodies;
 	// GALAXY
-	starGalaxy4(bodies);
+	starGalaxy3(bodies);
 	//computing for cpu
 #ifdef CPUPARALLEL
 	Cpu_Computing cpu_computer(bodies);
@@ -56,7 +56,7 @@ main()
 	float xTranslation = 10;
 	float yTranslation = 10;
 	
-	/// After this SFML stuff
+	/// SFML stuff
 	// clock for time keeping
 	sf::Clock elapsedTime;
 
