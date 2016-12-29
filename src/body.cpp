@@ -6,17 +6,13 @@
 
 #include "body.h"
 
-static const float G = 6.67408e-11;	// gravitational constant
-static float EPS = 4e1;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // user constructor
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-Body::Body(float m, vec3 p, vec3 v, bool im) : 
+Body::Body(float m, vec3 p, vec3 v) : 
 	mass(m), 
 	position(p), 
-	velocity(v),
-	isMoveable(im)
+	velocity(v)
 { }
 
 
@@ -36,5 +32,5 @@ Body::bodyInteraction(Body &othBody) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Body::updatePosition(float dt) {
-	if(isMoveable) this->position += dt * this->velocity * G;
+	this->position += dt * this->velocity * G;
 }

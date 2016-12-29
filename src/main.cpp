@@ -1,25 +1,56 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
-///
-/// Copyright (C) 2016/17      wulfihm, https://github.com/wulfihm/
-///
-////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
 #include "body.h"
+#include "cpu_computing.h"
 #include <iostream>
 #include <string>
 #include <math.h>
 
-unsigned static const int winWidth = 1280;
-unsigned static const int winHeight = 768;
-unsigned static const int numOneSideParticles = 7;
-
 int
 main()
 {
+	unsigned const int winWidth = 1280;
+	unsigned const int winHeight = 768;
+	unsigned const int numOneSideParticles = 7;
+
 	// vector for our bodies
 	std::vector<Body> bodies;
+
+	// fill vector body with bodies
+	for (int x = 0; x < numOneSideParticles; ++x) {
+		for (int y = 0; y < numOneSideParticles; ++y) {
+			for (int z = 0; z < numOneSideParticles; ++z) {
+				float distance = 130;
+				Body curBody(2e10, vec3(x * distance, y * distance, z * distance) + vec3(100, 100, 0), vec3(2e14, 0, 0));
+				bodies.push_back(curBody);
+			}
+		}
+	}
+
+	for (int x = 0; x < numOneSideParticles; ++x) {
+		for (int y = 0; y < numOneSideParticles; ++y) {
+			for (int z = 0; z < numOneSideParticles; ++z) {
+				float distance = 130;
+				Body curBody(2e10, vec3(x * distance + numOneSideParticles * 130, y * distance + 1920 + 1920 - numOneSideParticles * 130, -z * distance) + vec3(100, 100, 0), vec3(-2e14, 0, 0));
+				bodies.push_back(curBody);
+			}
+		}
+	}
+
+	Body starBody(3e18, vec3(numOneSideParticles * 130, 1920, 0), vec3(0, 0, 0));
+	bodies.push_back(starBody);
+
+	// get size
+	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
+
+	//computing for cpu
+	Cpu_Computing cpu_computer(bodies);
+	cpu_computer.setThreads(2);
+
+	// array of colors
+	unsigned char *vertexColors = new unsigned char[3 * bodies.size()];
 	// zoom factor
 	float zoomFactor = 0.1;
 	// time between frames
@@ -27,7 +58,7 @@ main()
 	// clock for time keeping
 	sf::Clock elapsedTime;
 	//for pausing
-	bool isPaused = true;
+	bool isPaused = false;
 
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
 
@@ -41,42 +72,6 @@ main()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(2);
 
-	// fill vector body with bodies
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				float distance = 130;
-				Body curBody(2e10, vec3(x * distance, y * distance, z * distance) + vec3(100, 100, 0), vec3(2e14, 0, 0), true);
-				bodies.push_back(curBody);
-			}
-		}
-	}
-
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				float distance = 130;
-				Body curBody(2e10, vec3(x * distance + numOneSideParticles * 130, y * distance + 1920 + 1920-numOneSideParticles*130, -z * distance) + vec3(100, 100, 0), vec3(-2e14, 0, 0), true);
-				bodies.push_back(curBody);
-			}
-		}
-	}
-
-
-
-	Body starBody(3e18, vec3(numOneSideParticles * 130, 1920, 0), vec3(0, 0, 0), true);
-	bodies.push_back(starBody);
-
-
-
-	// get size
-	std::cout << "Num Particles: " << bodies.size() << std::endl;
-	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
-
-	// array of coords
-	float *vertexCoords = new float[2 * bodies.size()];
-	// array of colors
-	unsigned char *vertexColors = new unsigned char[3 * bodies.size()];
 	elapsedTime.restart();
 	// window loop
 	while (window.isOpen())
@@ -103,16 +98,13 @@ main()
 		// clear the buffer
 		glClear(GL_COLOR_BUFFER_BIT);
 
-
-		//copying the bodies into the vertex arrays
-		for (int i = 0; i < bodies.size(); ++i)
+		//calculating color
+		for (unsigned int i = 0; i < cpu_computer.getSize(); ++i)
 		{
-			vertexCoords[2 * i] = bodies[i].position.x;
-			vertexCoords[2 * i + 1] = bodies[i].position.y;
-
-			vertexColors[3 * i] = 230;
+			int colorVal = cpu_computer.getPositions()[3 * i + 2]>0?255: cpu_computer.getPositions()[3 * i + 2]<0?127:0;
+			vertexColors[3 * i] = colorVal;
 			vertexColors[3 * i + 1] = 230;
-			vertexColors[3 * i + 2] = 255;
+			vertexColors[3 * i + 2] = colorVal;
 		}
 
 
@@ -126,9 +118,9 @@ main()
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glEnableClientState(GL_COLOR_ARRAY);
 
-		glVertexPointer(2, GL_FLOAT, 0, vertexCoords);
+		glVertexPointer(3, GL_FLOAT, 0, cpu_computer.positions);
 		glColorPointer(3, GL_UNSIGNED_BYTE, 0, vertexColors);
-		glDrawArrays(GL_POINTS, 0, bodies.size());
+		glDrawArrays(GL_POINTS, 0, cpu_computer.getSize());
 
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_COLOR_ARRAY);
@@ -142,14 +134,9 @@ main()
 
 		// gravitational updating etc.
 		if (!isPaused) {
-			for (int i = 0; i < bodies.size(); ++i)
-			{
-				for (int k = 0; k < bodies.size(); ++k)
-				{
-					bodies[i].bodyInteraction(bodies[k]);
-				}
-				bodies[i].updatePosition(1e-3f);
-			}
+#if 1
+			cpu_computer.compute(1e-3f);
+#endif
 		}
 
 		// time measurement

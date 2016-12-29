@@ -13,6 +13,8 @@ set( SFML_PATH ${CMAKE_CURRENT_SOURCE_DIR}/include/SFML/)
 set(SOURCE
    ${SRC_DIR}/main.cpp
    ${SRC_DIR}/body.cpp
+   ${SRC_DIR}/cpu_computing.cpp
+   ${SRC_DIR}/cuda_computing.cpp
 )
 
 set(CUDA_SOURCE
