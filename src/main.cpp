@@ -13,19 +13,19 @@
 #include <math.h>
 
 void
-testGalaxy(std::vector<Body> &bodies);
+testSystem(std::vector<Body> &bodies);
 
 void
-starGalaxy1(std::vector<Body> &bodies);
+starSystem1(std::vector<Body> &bodies);
 
 void
-starGalaxy2(std::vector<Body> &bodies);
+starSystem2(std::vector<Body> &bodies);
 
 void
-starGalaxy3(std::vector<Body> &bodies);
+starSystem3(std::vector<Body> &bodies);
 
 void
-starGalaxy4(std::vector<Body> &bodies);
+starSystem4(std::vector<Body> &bodies);
 
 int
 main()
@@ -36,8 +36,8 @@ main()
 	// get size
 	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
 	std::vector<Body> bodies;
-	// GALAXY
-	starGalaxy3(bodies);
+	// System
+	starSystem3(bodies);
 	//computing for cpu
 #ifdef CPUPARALLEL
 	Cpu_Computing cpu_computer(bodies);
@@ -46,8 +46,6 @@ main()
 	const float *positions = cpu_computer.getPositions();
 	const size_t sizeBodies = cpu_computer.getSize();
 #endif
-	// array of colors
-	unsigned char *vertexColors = new unsigned char[3 * sizeBodies];
 	// zoom factor
 	float zoomFactor = 0.05f;
 	// time between frames
@@ -130,7 +128,7 @@ main()
 		
 		// gravitational updating etc.
 #ifdef CPUPARALLEL
-		cpu_computer.compute(1e-3f);
+		cpu_computer.compute(1e-6f);
 #endif
 
 		// time measurement
@@ -143,7 +141,7 @@ main()
 
 
 void
-testGalaxy(std::vector<Body> &bodies)
+testSystem(std::vector<Body> &bodies)
 {
 	unsigned const int numOneSideParticles = 7;
 
@@ -165,7 +163,7 @@ testGalaxy(std::vector<Body> &bodies)
 
 
 void
-starGalaxy1(std::vector<Body> &bodies)
+starSystem1(std::vector<Body> &bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 
@@ -186,7 +184,7 @@ starGalaxy1(std::vector<Body> &bodies)
 }
 
 void 
-starGalaxy2(std::vector<Body>& bodies)
+starSystem2(std::vector<Body>& bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 
@@ -211,24 +209,24 @@ starGalaxy2(std::vector<Body>& bodies)
 }
 
 void 
-starGalaxy3(std::vector<Body>& bodies)
+starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 10;
+	unsigned const int numOneSideParticles = 5;
 
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
+	//bodies.push_back(starBody);
 	float distance = 300;
 	// fill vector body with bodies
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				Body curBody1(2e17, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
 				bodies.push_back(curBody1);
-				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				Body curBody2(2e12, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
 				bodies.push_back(curBody2);
-				Body curBody3(2e10, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, -2e14, 0));
+				Body curBody3(2e12, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
 				bodies.push_back(curBody3);
-				Body curBody4(2e10, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 2e14, 0));
+				Body curBody4(2e12, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
 				bodies.push_back(curBody4);
 			}
 		}
@@ -237,7 +235,7 @@ starGalaxy3(std::vector<Body>& bodies)
 
 }
 
-void starGalaxy4(std::vector<Body>& bodies)
+void starSystem4(std::vector<Body>& bodies)
 {
 
 	int radius = 2e5;
