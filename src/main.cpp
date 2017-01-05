@@ -214,19 +214,19 @@ starSystem3(std::vector<Body>& bodies)
 	unsigned const int numOneSideParticles = 5;
 
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
-	//bodies.push_back(starBody);
+	bodies.push_back(starBody);
 	float distance = 300;
 	// fill vector body with bodies
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(2e17, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				Body curBody1(2e12, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
 				bodies.push_back(curBody1);
-				Body curBody2(2e12, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				Body curBody2(2e12, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
 				bodies.push_back(curBody2);
-				Body curBody3(2e12, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				Body curBody3(2e12, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, -2e14, 0));
 				bodies.push_back(curBody3);
-				Body curBody4(2e12, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				Body curBody4(2e12, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 2e14, 0));
 				bodies.push_back(curBody4);
 			}
 		}
