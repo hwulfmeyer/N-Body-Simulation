@@ -65,7 +65,12 @@ Cpu_Computing::compute(float dt) {
 	float dtG = dt * G;
 	std::vector<std::thread> threads;
 	for (unsigned int i = 0; i < numThreads; ++i) {
-			threads.push_back(std::thread(&Cpu_Computing::computeTile, this, i, std::ref(numThreads), dtG));
+			threads.push_back(std::thread(
+				&Cpu_Computing::computeTile, 
+				this, 
+				i, 
+				std::ref(numThreads), dtG)
+			);
 		
 	}
 

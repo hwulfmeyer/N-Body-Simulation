@@ -3,12 +3,13 @@
 #ifndef _CPU_COMPUTING_H_
 #define _CPU_COMPUTING_H_
 
-#include "body.h"
 #include <vector>
 #include <iostream>
 #include <thread>
 #include <mutex>
 #include <glm/gtc/type_ptr.hpp>
+#include "body.h"
+
 
 
 class Cpu_Computing {

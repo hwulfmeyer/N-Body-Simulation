@@ -4,13 +4,13 @@
 #define _USE_MATH_DEFINES
 #define CPUPARALLEL
 
-#include <SFML/Graphics.hpp>
-#include <SFML/OpenGL.hpp>
-#include "body.h"
-#include "cpu_computing.h"
 #include <iostream>
 #include <string>
 #include <math.h>
+#include "body.h"
+#include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
+#include "cpu_computing.h"
 
 void
 testGalaxy(std::vector<Body> &bodies);
@@ -130,7 +130,7 @@ main()
 		
 		// gravitational updating etc.
 #ifdef CPUPARALLEL
-		cpu_computer.compute(1e-3f);
+		cpu_computer.compute(3e-5);
 #endif
 
 		// time measurement
@@ -154,9 +154,17 @@ testGalaxy(std::vector<Body> &bodies)
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(0, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				Body curBody1(
+					0, 
+					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), 
+					glm::vec3(0, 0, 0)
+				);
 				bodies.push_back(curBody1);
-				Body curBody2(0, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 0, 0));
+				Body curBody2(
+					0, 
+					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), 
+					glm::vec3(0, 0, 0)
+				);
 				bodies.push_back(curBody2);
 			}
 		}
@@ -176,9 +184,17 @@ starGalaxy1(std::vector<Body> &bodies)
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				Body curBody1(
+					2e10, 
+					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), 
+					glm::vec3(2e14, 0, 0)
+				);
 				bodies.push_back(curBody1);
-				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				Body curBody2(
+					2e10, 
+					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), 
+					glm::vec3(-2e14, 0, 0)
+				);
 				bodies.push_back(curBody2);
 			}
 		}
@@ -197,13 +213,29 @@ starGalaxy2(std::vector<Body>& bodies)
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				Body curBody1(
+					2e10, 
+					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(2e14, 0, 0)
+				);
 				bodies.push_back(curBody1);
-				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				Body curBody2(
+					2e10, 
+					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(-2e14, 0, 0)
+				);
 				bodies.push_back(curBody2);
-				Body curBody3(2e10, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, -2e14, 0));
+				Body curBody3(
+					2e10, 
+					starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(0, -2e14, 0)
+				);
 				bodies.push_back(curBody3);
-				Body curBody4(2e10, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 2e14, 0));
+				Body curBody4(
+					2e10, 
+					starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(0, 2e14, 0)
+				);
 				bodies.push_back(curBody4);
 			}
 		}
@@ -214,7 +246,7 @@ void
 starGalaxy3(std::vector<Body>& bodies)
 {
 	unsigned const int numOneSideParticles = 10;
-
+	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
 	float distance = 300;
@@ -222,13 +254,28 @@ starGalaxy3(std::vector<Body>& bodies)
 	for (int x = 0; x < numOneSideParticles; ++x) {
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(2e10, starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(2e14, 0, 0));
+				Body curBody1(
+					2e10, 
+					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(speed, 0, 0)
+				);
 				bodies.push_back(curBody1);
-				Body curBody2(2e10, starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(-2e14, 0, 0));
+				Body curBody2(
+					2e10,
+					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(-speed, 0, 0));
 				bodies.push_back(curBody2);
-				Body curBody3(2e10, starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, -2e14, 0));
+				Body curBody3(
+					2e10,
+					starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(0, -speed, 0)
+				);
 				bodies.push_back(curBody3);
-				Body curBody4(2e10, starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance), glm::vec3(0, 2e14, 0));
+				Body curBody4(
+					2e10, 
+					starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance),
+					glm::vec3(0, speed, 0)
+				);
 				bodies.push_back(curBody4);
 			}
 		}
