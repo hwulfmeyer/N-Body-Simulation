@@ -59,7 +59,7 @@ Cpu_Computing::setThreads(unsigned int nthreads) {
 // spawns threads and waits for all of them to finish
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void 
-Cpu_Computing::compute(float dt) {
+Cpu_Computing::compute_forces(float dt) {
 
 	// spawn threads
 	float dtG = dt * G;

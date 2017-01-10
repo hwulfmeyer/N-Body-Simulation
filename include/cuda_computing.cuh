@@ -1,40 +1,31 @@
-
-
-#ifndef _CPU_COMPUTING_H_
-#define _CPU_COMPUTING_H_
+#ifndef _CUDA_COMPUTING_H_
+#define _CUDA_COMPUTING_H_
 
 #include <vector>
 #include <iostream>
-#include <thread>
-#include <mutex>
 #include <glm/gtc/type_ptr.hpp>
 #include "body.h"
 
 
 
-class Cpu_Computing {
+class Cuda_Computing {
 public:
 
 	//constructor
-	Cpu_Computing(std::vector<Body> &bodies);
+	Cuda_Computing(std::vector<Body> &bodies);
 
 	//destructor
-	~Cpu_Computing();
+	~Cuda_Computing();
 
+	bool initDevice();
 
-	void setThreads();
-
-	void setThreads(unsigned int nthreads);
+	bool initDeviceMemory();
 
 	void compute_forces(float dt);
-
-	void computeTile(const int tid, const int &num_threads, float dt);
 
 	const float *getPositions() const;
 
 	size_t getSize() const;
-
-
 
 private:
 
@@ -48,16 +39,12 @@ private:
 	glm::vec3 *velocities;
 	// number of threads
 	unsigned int numThreads;
-	// mutex to control access to the arrays
-	std::mutex mutexTiles;
 
 
 private:
 
 	//def constructor
-	Cpu_Computing();
-
-
+	Cuda_Computing();
 
 };
 

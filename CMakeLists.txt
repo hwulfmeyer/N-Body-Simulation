@@ -19,6 +19,7 @@ set(SOURCE
 
 set(CUDA_SOURCE
    ${SOURCE}
+   ${SRC_DIR}/cuda_computing.cu
 )
 
 set(INCLUDE_DIRS
