@@ -13,19 +13,19 @@
 #include "cpu_computing.h"
 
 void
-testGalaxy(std::vector<Body> &bodies);
+testSystem(std::vector<Body> &bodies);
 
 void
-starGalaxy1(std::vector<Body> &bodies);
+starSystem1(std::vector<Body> &bodies);
 
 void
-starGalaxy2(std::vector<Body> &bodies);
+starSystem2(std::vector<Body> &bodies);
 
 void
-starGalaxy3(std::vector<Body> &bodies);
+starSystem3(std::vector<Body> &bodies);
 
 void
-starGalaxy4(std::vector<Body> &bodies);
+starSystem4(std::vector<Body> &bodies);
 
 int
 main()
@@ -36,8 +36,8 @@ main()
 	// get size
 	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
 	std::vector<Body> bodies;
-	// GALAXY
-	starGalaxy3(bodies);
+	// System
+	starSystem3(bodies);
 	//computing for cpu
 #ifdef CPUPARALLEL
 	Cpu_Computing cpu_computer(bodies);
@@ -46,8 +46,6 @@ main()
 	const float *positions = cpu_computer.getPositions();
 	const size_t sizeBodies = cpu_computer.getSize();
 #endif
-	// array of colors
-	unsigned char *vertexColors = new unsigned char[3 * sizeBodies];
 	// zoom factor
 	float zoomFactor = 0.05f;
 	// time between frames
@@ -143,7 +141,7 @@ main()
 
 
 void
-testGalaxy(std::vector<Body> &bodies)
+testSystem(std::vector<Body> &bodies)
 {
 	unsigned const int numOneSideParticles = 7;
 
@@ -173,7 +171,7 @@ testGalaxy(std::vector<Body> &bodies)
 
 
 void
-starGalaxy1(std::vector<Body> &bodies)
+starSystem1(std::vector<Body> &bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 
@@ -202,7 +200,7 @@ starGalaxy1(std::vector<Body> &bodies)
 }
 
 void 
-starGalaxy2(std::vector<Body>& bodies)
+starSystem2(std::vector<Body>& bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 
@@ -243,7 +241,7 @@ starGalaxy2(std::vector<Body>& bodies)
 }
 
 void 
-starGalaxy3(std::vector<Body>& bodies)
+starSystem3(std::vector<Body>& bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 	float speed = 2e15;
@@ -284,7 +282,7 @@ starGalaxy3(std::vector<Body>& bodies)
 
 }
 
-void starGalaxy4(std::vector<Body>& bodies)
+void starSystem4(std::vector<Body>& bodies)
 {
 
 	int radius = 2e5;

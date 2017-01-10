@@ -64,6 +64,7 @@ With softening factor & simplification:
 Drawing is done with OpenGL.
 
 Libraries (https://www.opengl.org/wiki/Related_toolkits_and_APIs)
+UI: http://anttweakbar.sourceforge.net/doc/
 
 ### Algorithm Optimization
 

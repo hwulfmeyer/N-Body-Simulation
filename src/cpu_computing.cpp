@@ -91,7 +91,7 @@ Cpu_Computing::computeTile(const int tid, const int &num_threads, float dtG){
 
 	// cache for later writing
 	glm::vec3 *vel_cache = new glm::vec3[i_end - i_start];
-	// cache for position so we can overwrite them in other threads
+	// cache for positions so we can overwrite them in other threads
 	std::vector<glm::vec3> pos_copy = positions;
 
 	glm::vec3 dir;
