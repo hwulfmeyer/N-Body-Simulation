@@ -71,7 +71,6 @@ Cpu_Computing::compute_forces(float dt) {
 				i, 
 				std::ref(numThreads), dtG)
 			);
-		
 	}
 
 	// wait for all threads to finish

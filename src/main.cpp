@@ -2,7 +2,7 @@
 
 
 #define _USE_MATH_DEFINES
-#define CPUPARALLEL
+#define CUDAPARALLEL
 
 #include <iostream>
 #include <string>
@@ -11,6 +11,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
 #include "cpu_computing.h"
+#include "cuda_computing.cuh"
 
 void
 testSystem(std::vector<Body> &bodies);
@@ -46,6 +47,15 @@ main()
 	const float *positions = cpu_computer.getPositions();
 	const size_t sizeBodies = cpu_computer.getSize();
 #endif
+#ifdef CUDAPARALLEL
+	Cuda_Computing cuda_computer(bodies);
+	cuda_computer.initDevice();
+	cuda_computer.initDeviceMemory();
+
+	const float *positions = cuda_computer.getPositions();
+	const size_t sizeBodies = cuda_computer.getSize();
+#endif
+
 	// zoom factor
 	float zoomFactor = 0.05f;
 	// time between frames
@@ -128,7 +138,13 @@ main()
 		
 		// gravitational updating etc.
 #ifdef CPUPARALLEL
-		cpu_computer.compute_forces(3e-5);
+		cpu_computer.compute_forces(3e-5f);
+#endif
+#ifdef CUDAPARALLEL
+		//compute forces on cuda
+		cuda_computer.computeForces(3e-10f);
+		positions = cuda_computer.getPositions();
+		//get positions from cuda device
 #endif
 
 		// time measurement
@@ -246,7 +262,7 @@ starSystem2(std::vector<Body>& bodies)
 void 
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 10;
+	unsigned const int numOneSideParticles = 2;
 	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);

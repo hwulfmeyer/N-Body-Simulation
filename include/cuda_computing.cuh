@@ -1,9 +1,17 @@
+
+
+
 #ifndef _CUDA_COMPUTING_H_
 #define _CUDA_COMPUTING_H_
 
 #include <vector>
 #include <iostream>
+#include <algorithm>
 #include <glm/gtc/type_ptr.hpp>
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include "cuda_util.h"
 #include "body.h"
 
 
@@ -21,7 +29,7 @@ public:
 
 	bool initDeviceMemory();
 
-	void compute_forces(float dt);
+	void computeForces(const float &dtG);
 
 	const float *getPositions() const;
 
@@ -32,13 +40,14 @@ private:
 	// number of bodies
 	const size_t size;
 	// array of coords
-	std::vector<glm::vec3> positions;
+	glm::vec3 *positions;
 	// array of masses
 	float *masses;
 	// array of velocities
 	glm::vec3 *velocities;
-	// number of threads
-	unsigned int numThreads;
+	// threads per block on cuda device
+	unsigned int num_threads_per_block;
+	unsigned int num_blocks;
 
 
 private:
