@@ -191,15 +191,16 @@ Cuda_Computing::computeForces(float dt) {
 	device_computeForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, size, EPS2);
 
 	// run kernel integrating velocities
-	device_integrateForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, size, dtG);
+	device_integrateForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, size, dtG);	
+}
 
-
+void
+Cuda_Computing::copyPositionsFromDevice() {
 	// copy result back to host
 	checkErrorsCuda(cudaMemcpy((void *)positions, (void *)Device::positions,
 		size * sizeof(glm::vec3),
 		cudaMemcpyDeviceToHost)
 	);
-	
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

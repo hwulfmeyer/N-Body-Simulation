@@ -31,6 +31,8 @@ public:
 
 	void computeForces(float dt);
 
+	void copyPositionsFromDevice();
+
 	const float *getPositions() const;
 
 	size_t getSize() const;

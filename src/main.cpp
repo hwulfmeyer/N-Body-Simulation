@@ -61,6 +61,8 @@ main()
 	float zoomFactor = 0.05f;
 	// time between frames
 	float dt = 0;
+	// time keeper for updating
+	float timercopying = 0;
 	// translation
 	float xTranslation = 10;
 	float yTranslation = 10;
@@ -148,6 +150,8 @@ main()
 #ifdef CUDAPARALLEL
 		//compute forces on cuda
 		cuda_computer.computeForces(3e-5f);
+		
+		cuda_computer.copyPositionsFromDevice();
 #endif
 
 		// time measurement
