@@ -13,6 +13,10 @@
 #include "cpu_computing.h"
 #include "cuda_computing.cuh"
 
+
+float
+updateAverageFrames(float curFrames);
+
 void
 testSystem(std::vector<Body> &bodies);
 
@@ -63,6 +67,9 @@ main()
 	// translation
 	float xTranslation = 10;
 	float yTranslation = 10;
+	float avgFPS = 0;
+	int frameRuns = 0;
+	sf::Event event;
 	
 	/// SFML stuff
 	// clock for time keeping
@@ -84,13 +91,13 @@ main()
 	// window loop
 	while (window.isOpen())
 	{
-		sf::Event event;
+
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
 				window.close();
 		}
-
+		/*
 		//zooming
 		if (window.hasFocus()) {
 			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
@@ -105,12 +112,12 @@ main()
 				xTranslation += dt * 200;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
 				xTranslation -= dt * 200;
-			/*
+			
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
 			glRotatef(100 * dt * zoomFactor, 0, 1, 0);
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::E))
 			glRotatef(-100 * dt * zoomFactor, 0, 1, 0);
-			*/
+			
 		}
 
 
@@ -134,8 +141,8 @@ main()
 
 		glFlush();
 		window.display();
+		*/
 
-		
 		// gravitational updating etc.
 #ifdef CPUPARALLEL
 		cpu_computer.compute_forces(3e-5f);
@@ -147,8 +154,16 @@ main()
 
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();
-		window.setTitle(std::to_string(int(1.f / dt)) + " FPS");
+		float curFPS = 1.f / dt;
+		window.setTitle(std::to_string(int(curFPS)) + " FPS");
+
+		//calculating average fps
+		++frameRuns;
+		avgFPS += (curFPS - avgFPS) / frameRuns;
 	}
+
+	std::cout << "Average FPS: " << avgFPS << std::endl;
+	getchar();
 
 	return 0;
 }
@@ -260,7 +275,7 @@ starSystem2(std::vector<Body>& bodies)
 void 
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 15;
+	unsigned const int numOneSideParticles = 16;
 	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);

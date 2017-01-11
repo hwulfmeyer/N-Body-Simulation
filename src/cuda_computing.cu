@@ -72,17 +72,11 @@ Cuda_Computing::initDevice() {
 	checkErrorsCuda(cudaGetDeviceProperties(&device_props, device_handle));
 	//std::cout << "Max CC: " << device_props.major << "   Min CC: " << device_props.minor << std::endl;
 
-	// determine max threads 
-	unsigned int max_threads_per_block = device_props.maxThreadsPerBlock;
-	unsigned int max_threads_per_block_sqrt = std::sqrt(max_threads_per_block);
-	assert(max_threads_per_block_sqrt * max_threads_per_block_sqrt == max_threads_per_block);
-
-	/* hard coding max threads cause of errors */
-	//max_threads_per_block_sqrt = 2;
-
 	// determine thread layout
-	num_threads_per_block = std::min(size, max_threads_per_block_sqrt);
-	num_blocks = size / max_threads_per_block_sqrt;
+	unsigned int max_threads_per_block = 128;
+
+	num_threads_per_block = std::min(size, max_threads_per_block);
+	num_blocks = size / max_threads_per_block;
 	if (0 != size % max_threads_per_block) {
 		num_blocks++;
 	}
@@ -106,26 +100,26 @@ Cuda_Computing::initDeviceMemory() {
 	Device::velocities = this->velocities;
 
 	// allocate device memory
-	checkErrorsCuda(cudaMalloc(&Device::positions,
+	checkErrorsCuda(cudaMalloc((void **)&Device::positions,
 		size * sizeof(glm::vec3))
 	);
-	checkErrorsCuda(cudaMalloc(&Device::masses,
+	checkErrorsCuda(cudaMalloc((void **)&Device::masses,
 		size * sizeof(float))
 	);
-	checkErrorsCuda(cudaMalloc(&Device::velocities,
+	checkErrorsCuda(cudaMalloc((void **)&Device::velocities,
 		size * sizeof(glm::vec3))
 	);
 
 	// copy device memory
-	checkErrorsCuda(cudaMemcpy(Device::positions, positions,
+	checkErrorsCuda(cudaMemcpy((void *)Device::positions, (void *)positions,
 		size * sizeof(glm::vec3),
 		cudaMemcpyHostToDevice)
 	);
-	checkErrorsCuda(cudaMemcpy(Device::masses, masses,
+	checkErrorsCuda(cudaMemcpy((void *)Device::masses, (void *)masses,
 		size * sizeof(float),
 		cudaMemcpyHostToDevice)
 	);
-	checkErrorsCuda(cudaMemcpy(Device::velocities, velocities,
+	checkErrorsCuda(cudaMemcpy((void *)Device::velocities, (void *)velocities,
 		size * sizeof(glm::vec3),
 		cudaMemcpyHostToDevice)
 	);
@@ -139,11 +133,11 @@ Cuda_Computing::initDeviceMemory() {
 __device__
 glm::vec3
 bodyBodyInteraction(glm::vec3 pos_body_cur, glm::vec3 pos_body_oth, float mass_oth, float EPS2) {
-	glm::vec3 dir = pos_body_oth - pos_body_cur;
-	float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPS2;
+	glm::vec3 dir = pos_body_oth - pos_body_cur; // 3 FLOP
+	float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPS2; // 6 FLOP
 
-	float partForce = mass_oth / sqrt(distSqr*distSqr*distSqr);
-	return dir * partForce;
+	float partForce = mass_oth / sqrt(distSqr*distSqr*distSqr); // 4 FLOP
+	return dir * partForce; // 3 FLOP
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,7 +153,8 @@ device_computeForces(glm::vec3 *positions, float* masses, glm::vec3 *velocities,
 		glm::vec3 velo;
 		for (unsigned int k = 0; k < N; ++k)
 		{
-			velo += bodyBodyInteraction(positions[tid], positions[k], masses[k], EPS2);
+			velo += bodyBodyInteraction(positions[tid], positions[k], masses[k], EPS2); // 3 FLOP
+			// in total 19 FLOP per body body Interaction 
 		}
 
 		velocities[tid] += velo;
@@ -201,7 +196,7 @@ Cuda_Computing::computeForces(float dt) {
 	cudaDeviceSynchronize();
 
 	// copy result back to host
-	checkErrorsCuda(cudaMemcpy(positions, Device::positions,
+	checkErrorsCuda(cudaMemcpy((void *)positions, (void *)Device::positions,
 		size * sizeof(glm::vec3),
 		cudaMemcpyDeviceToHost)
 	);
