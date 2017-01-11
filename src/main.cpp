@@ -14,9 +14,6 @@
 #include "cuda_computing.cuh"
 
 
-float
-updateAverageFrames(float curFrames);
-
 void
 testSystem(std::vector<Body> &bodies);
 
@@ -97,7 +94,7 @@ main()
 			if (event.type == sf::Event::Closed)
 				window.close();
 		}
-		/*
+#if 1 // turn drawing on/off
 		//zooming
 		if (window.hasFocus()) {
 			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
@@ -113,11 +110,12 @@ main()
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
 				xTranslation -= dt * 200;
 			
+			/*
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
 			glRotatef(100 * dt * zoomFactor, 0, 1, 0);
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::E))
 			glRotatef(-100 * dt * zoomFactor, 0, 1, 0);
-			
+			*/
 		}
 
 
@@ -141,7 +139,7 @@ main()
 
 		glFlush();
 		window.display();
-		*/
+#endif
 
 		// gravitational updating etc.
 #ifdef CPUPARALLEL
@@ -157,7 +155,7 @@ main()
 		float curFPS = 1.f / dt;
 		window.setTitle(std::to_string(int(curFPS)) + " FPS");
 
-		//calculating average fps
+		// calculating average fps
 		++frameRuns;
 		avgFPS += (curFPS - avgFPS) / frameRuns;
 	}

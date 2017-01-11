@@ -185,22 +185,21 @@ device_integrateForces(glm::vec3 *positions, glm::vec3 *velocities, const int N,
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Cuda_Computing::computeForces(float dt) {
-	cudaDeviceSynchronize();
 
 	float dtG = dt*G;
 	// run kernel computing velocities
 	device_computeForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, size, EPS2);
-	cudaDeviceSynchronize();
+
 	// run kernel integrating velocities
 	device_integrateForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, size, dtG);
-	cudaDeviceSynchronize();
+
 
 	// copy result back to host
 	checkErrorsCuda(cudaMemcpy((void *)positions, (void *)Device::positions,
 		size * sizeof(glm::vec3),
 		cudaMemcpyDeviceToHost)
 	);
-
+	
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
