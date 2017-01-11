@@ -78,7 +78,7 @@ Cuda_Computing::initDevice() {
 	assert(max_threads_per_block_sqrt * max_threads_per_block_sqrt == max_threads_per_block);
 
 	/* hard coding max threads cause of errors */
-	max_threads_per_block_sqrt = 2;
+	//max_threads_per_block_sqrt = 2;
 
 	// determine thread layout
 	num_threads_per_block = std::min(size, max_threads_per_block_sqrt);
@@ -147,34 +147,57 @@ bodyBodyInteraction(glm::vec3 pos_body_cur, glm::vec3 pos_body_oth, float mass_o
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// kernel
+// kernel for computing velocities
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 __global__
 void
-device_computeForces(glm::vec3 *positions, float* masses, glm::vec3 *velocities, const float dtG, const int N, float EPS2) {
+device_computeForces(glm::vec3 *positions, float* masses, glm::vec3 *velocities, const int N, float EPS2) {
 	
 	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (tid < N) {
+		glm::vec3 velo;
 		for (unsigned int k = 0; k < N; ++k)
 		{
-			velocities[tid] += bodyBodyInteraction(positions[tid], positions[k], masses[k], EPS2);
+			velo += bodyBodyInteraction(positions[tid], positions[k], masses[k], EPS2);
 		}
 
-		positions[tid] += dtG * velocities[tid];
+		velocities[tid] += velo;
 	}
+
 	
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// kernel for integration step using calculated velocities before
+////////////////////////////////////////////////////////////////////////////////////////////////////
+__global__
+void
+device_integrateForces(glm::vec3 *positions, glm::vec3 *velocities, const int N, float dtG) {
+
+	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+	glm::vec3 velo = glm::vec3(0, 0, 0);
+	if (tid < N) {
+		positions[tid] += dtG * velocities[tid];
+	}
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // kernel entry point
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-Cuda_Computing::computeForces(const float &dtG) {
+Cuda_Computing::computeForces(float dt) {
 	cudaDeviceSynchronize();
 
-	//run kernel
-	device_computeForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, dtG, size, EPS2);
+	float dtG = dt*G;
+	// run kernel computing velocities
+	device_computeForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, size, EPS2);
+	cudaDeviceSynchronize();
+	// run kernel integrating velocities
+	device_integrateForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, size, dtG);
 	cudaDeviceSynchronize();
 
 	// copy result back to host

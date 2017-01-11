@@ -142,9 +142,7 @@ main()
 #endif
 #ifdef CUDAPARALLEL
 		//compute forces on cuda
-		cuda_computer.computeForces(3e-10f);
-		positions = cuda_computer.getPositions();
-		//get positions from cuda device
+		cuda_computer.computeForces(3e-5f);
 #endif
 
 		// time measurement
@@ -162,9 +160,9 @@ main()
 void
 testSystem(std::vector<Body> &bodies)
 {
-	unsigned const int numOneSideParticles = 7;
+	unsigned const int numOneSideParticles = 13;
 
-	Body starBody(0, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	Body starBody(1e10, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
 	float distance = 300;
 	// fill vector body with bodies
@@ -262,7 +260,7 @@ starSystem2(std::vector<Body>& bodies)
 void 
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 2;
+	unsigned const int numOneSideParticles = 15;
 	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);

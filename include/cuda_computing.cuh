@@ -29,7 +29,7 @@ public:
 
 	bool initDeviceMemory();
 
-	void computeForces(const float &dtG);
+	void computeForces(float dt);
 
 	const float *getPositions() const;
 

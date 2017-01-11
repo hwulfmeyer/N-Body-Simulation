@@ -26,7 +26,7 @@ public:
 
 	void setThreads(unsigned int nthreads);
 
-	void compute_forces(float dtG);
+	void compute_forces(float dt);
 
 	void computeTile(const int tid, const int &num_threads, float dtG);
 
