@@ -15,12 +15,12 @@ namespace Device {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // constructor, copies all the stuff to this class
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : size(bodies.size()) {
-	this->positions = new glm::vec3[size];
-	this->masses = new float[size];
-	this->velocities = new glm::vec3[size];
+Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : N(bodies.size()) {
+	this->positions = new glm::vec3[N];
+	this->masses = new float[N];
+	this->velocities = new glm::vec3[N];
 
-	for (unsigned int i = 0; i < size; ++i)
+	for (unsigned int i = 0; i < N; ++i)
 	{
 		positions[i] = bodies[i].position;
 
@@ -29,7 +29,7 @@ Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : size(bodies.size()) 
 		velocities[i] = bodies[i].velocity;
 	}
 
-	std::cout << "Cuda_Computing::Cuda_Computing() - Copying of " << size << " bodies done." << std::endl;
+	std::cout << "Cuda_Computing::Cuda_Computing() - Copying of " << N << " bodies done." << std::endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,9 +75,9 @@ Cuda_Computing::initDevice() {
 	// determine thread layout
 	unsigned int max_threads_per_block = 128;
 
-	num_threads_per_block = std::min(size, max_threads_per_block);
-	num_blocks = size / max_threads_per_block;
-	if (0 != size % max_threads_per_block) {
+	num_threads_per_block = std::min(N, max_threads_per_block);
+	num_blocks = N / max_threads_per_block;
+	if (0 != N % max_threads_per_block) {
 		num_blocks++;
 	}
 	std::cout << "num_blocks = " << num_blocks << " :: "
@@ -101,26 +101,26 @@ Cuda_Computing::initDeviceMemory() {
 
 	// allocate device memory
 	checkErrorsCuda(cudaMalloc((void **)&Device::positions,
-		size * sizeof(glm::vec3))
+		N * sizeof(glm::vec3))
 	);
 	checkErrorsCuda(cudaMalloc((void **)&Device::masses,
-		size * sizeof(float))
+		N * sizeof(float))
 	);
 	checkErrorsCuda(cudaMalloc((void **)&Device::velocities,
-		size * sizeof(glm::vec3))
+		N * sizeof(glm::vec3))
 	);
 
 	// copy device memory
 	checkErrorsCuda(cudaMemcpy((void *)Device::positions, (void *)positions,
-		size * sizeof(glm::vec3),
+		N * sizeof(glm::vec3),
 		cudaMemcpyHostToDevice)
 	);
 	checkErrorsCuda(cudaMemcpy((void *)Device::masses, (void *)masses,
-		size * sizeof(float),
+		N * sizeof(float),
 		cudaMemcpyHostToDevice)
 	);
 	checkErrorsCuda(cudaMemcpy((void *)Device::velocities, (void *)velocities,
-		size * sizeof(glm::vec3),
+		N * sizeof(glm::vec3),
 		cudaMemcpyHostToDevice)
 	);
 
@@ -145,7 +145,7 @@ bodyBodyInteraction(glm::vec3 pos_body_cur, glm::vec3 pos_body_oth, float mass_o
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 __global__
 void
-device_computeForces(glm::vec3 *positions, float* masses, glm::vec3 *velocities, const int N, float EPS2) {
+device_computeVelocities(glm::vec3 *positions, float* masses, glm::vec3 *velocities, const int N, float EPS2) {
 	
 	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -154,7 +154,7 @@ device_computeForces(glm::vec3 *positions, float* masses, glm::vec3 *velocities,
 		for (unsigned int k = 0; k < N; ++k)
 		{
 			velo += bodyBodyInteraction(positions[tid], positions[k], masses[k], EPS2); // 3 FLOP
-			// in total 19 FLOP per body body Interaction 
+			// in total 19 FLOP per body body Interaction
 		}
 
 		velocities[tid] += velo;
@@ -168,7 +168,7 @@ device_computeForces(glm::vec3 *positions, float* masses, glm::vec3 *velocities,
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 __global__
 void
-device_integrateForces(glm::vec3 *positions, glm::vec3 *velocities, const int N, float dtG) {
+device_integrateVelocities(glm::vec3 *positions, glm::vec3 *velocities, const int N, float dtG) {
 
 	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -178,27 +178,26 @@ device_integrateForces(glm::vec3 *positions, glm::vec3 *velocities, const int N,
 	}
 }
 
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // kernel entry point
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Cuda_Computing::computeForces(float dt) {
-
-	float dtG = dt*G;
 	// run kernel computing velocities
-	device_computeForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, size, EPS2);
+	device_computeVelocities <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, N, EPS2);
 
 	// run kernel integrating velocities
-	device_integrateForces <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, size, dtG);	
+	device_integrateVelocities <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, N, dt*G);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// copying from device to host (with openGL inop not necessary)
+////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Cuda_Computing::copyPositionsFromDevice() {
 	// copy result back to host
 	checkErrorsCuda(cudaMemcpy((void *)positions, (void *)Device::positions,
-		size * sizeof(glm::vec3),
+		N * sizeof(glm::vec3),
 		cudaMemcpyDeviceToHost)
 	);
 }
@@ -217,11 +216,5 @@ Cuda_Computing::getPositions() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 size_t 
 Cuda_Computing::getSize() const {
-	return size;
+	return N;
 }
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//! Entry point to device == KERNEL
-////////////////////////////////////////////////////////////////////////////////////////////////////

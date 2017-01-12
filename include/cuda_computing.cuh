@@ -40,7 +40,7 @@ public:
 private:
 
 	// number of bodies
-	const size_t size;
+	const size_t N;
 	// array of coords
 	glm::vec3 *positions;
 	// array of masses

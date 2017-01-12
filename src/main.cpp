@@ -68,6 +68,7 @@ main()
 	float yTranslation = 10;
 	float avgFPS = 0;
 	int frameRuns = 0;
+	float curFPS = 0;
 	sf::Event event;
 	
 	/// SFML stuff
@@ -76,6 +77,7 @@ main()
 
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
 
+	/*
 	glViewport(0, 0, winWidth, winHeight);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -85,6 +87,7 @@ main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(2);
+	*/
 
 	elapsedTime.restart();
 	// window loop
@@ -96,7 +99,9 @@ main()
 			if (event.type == sf::Event::Closed)
 				window.close();
 		}
-#if 1 // turn drawing on/off
+
+		// turn drawing on/off
+#if 0
 		//zooming
 		if (window.hasFocus()) {
 			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
@@ -154,11 +159,11 @@ main()
 		cuda_computer.copyPositionsFromDevice();
 #endif
 
+
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();
-		float curFPS = 1.f / dt;
+		curFPS = 1.f / dt;
 		window.setTitle(std::to_string(int(curFPS)) + " FPS");
-
 		// calculating average fps
 		++frameRuns;
 		avgFPS += (curFPS - avgFPS) / frameRuns;
@@ -277,7 +282,7 @@ starSystem2(std::vector<Body>& bodies)
 void 
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 16;
+	unsigned const int numOneSideParticles = 40;
 	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
@@ -316,7 +321,8 @@ starSystem3(std::vector<Body>& bodies)
 
 }
 
-void starSystem4(std::vector<Body>& bodies)
+void 
+starSystem4(std::vector<Body>& bodies)
 {
 
 	int radius = 2e5;
