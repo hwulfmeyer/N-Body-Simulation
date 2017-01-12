@@ -69,15 +69,11 @@ main()
 	float avgFPS = 0;
 	int frameRuns = 0;
 	float curFPS = 0;
-	sf::Event event;
+
 	
 	/// SFML stuff
-	// clock for time keeping
-	sf::Clock elapsedTime;
-
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
-
-	/*
+	
 	glViewport(0, 0, winWidth, winHeight);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -87,9 +83,14 @@ main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(2);
-	*/
+	
+
+	// clock for time keeping
+	sf::Clock elapsedTime;
+	sf::Event event;
 
 	elapsedTime.restart();
+
 	// window loop
 	while (window.isOpen())
 	{
@@ -100,8 +101,8 @@ main()
 				window.close();
 		}
 
-		// turn drawing on/off
-#if 0
+		
+#if 0	// turn drawing on/off
 		//zooming
 		if (window.hasFocus()) {
 			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
@@ -116,13 +117,6 @@ main()
 				xTranslation += dt * 200;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
 				xTranslation -= dt * 200;
-			
-			/*
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
-			glRotatef(100 * dt * zoomFactor, 0, 1, 0);
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::E))
-			glRotatef(-100 * dt * zoomFactor, 0, 1, 0);
-			*/
 		}
 
 
@@ -148,7 +142,7 @@ main()
 		window.display();
 #endif
 
-		// gravitational updating etc.
+		/// nbody calculations
 #ifdef CPUPARALLEL
 		cpu_computer.compute_forces(3e-5f);
 #endif
@@ -156,10 +150,9 @@ main()
 		//compute forces on cuda
 		cuda_computer.computeForces(3e-5f);
 		
-		cuda_computer.copyPositionsFromDevice();
+		//cuda_computer.copyPositionsFromDevice();
 #endif
-
-
+		/*
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();
 		curFPS = 1.f / dt;
@@ -167,8 +160,10 @@ main()
 		// calculating average fps
 		++frameRuns;
 		avgFPS += (curFPS - avgFPS) / frameRuns;
+		*/
 	}
 
+	cudaDeviceSynchronize();
 	std::cout << "Average FPS: " << avgFPS << std::endl;
 	getchar();
 
@@ -282,7 +277,7 @@ starSystem2(std::vector<Body>& bodies)
 void 
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 40;
+	unsigned const int numOneSideParticles = 20;
 	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
