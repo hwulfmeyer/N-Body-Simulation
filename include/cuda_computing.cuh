@@ -7,7 +7,7 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
-#include <glm/gtc/type_ptr.hpp>
+#include "vector_types.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"
@@ -42,11 +42,11 @@ private:
 	// number of bodies
 	const size_t N;
 	// array of coords
-	glm::vec3 *positions;
+	float3 *positions;
 	// array of masses
 	float *masses;
 	// array of velocities
-	glm::vec3 *velocities;
+	float3 *velocities;
 	// threads per block on cuda device
 	unsigned int num_threads_per_block;
 	unsigned int num_blocks;

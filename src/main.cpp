@@ -150,9 +150,9 @@ main()
 		//compute forces on cuda
 		cuda_computer.computeForces(3e-5f);
 		
-		//cuda_computer.copyPositionsFromDevice();
+		cuda_computer.copyPositionsFromDevice();
 #endif
-		/*
+		
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();
 		curFPS = 1.f / dt;
@@ -160,10 +160,9 @@ main()
 		// calculating average fps
 		++frameRuns;
 		avgFPS += (curFPS - avgFPS) / frameRuns;
-		*/
+		
 	}
 
-	cudaDeviceSynchronize();
 	std::cout << "Average FPS: " << avgFPS << std::endl;
 	getchar();
 
@@ -277,7 +276,7 @@ starSystem2(std::vector<Body>& bodies)
 void 
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 20;
+	unsigned const int numOneSideParticles = 50;
 	float speed = 2e15;
 	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
