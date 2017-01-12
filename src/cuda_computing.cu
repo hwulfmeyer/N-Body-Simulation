@@ -10,6 +10,66 @@ namespace Device {
 	float *masses;
 	// array of velocities
 	float3 *velocities;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// device physics calculations
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__device__
+		float3
+		bodyBodyInteraction(float3 pos_body_cur, float3 pos_body_oth, float mass_oth, float epss, float3 velo) {
+		float3 dir;
+		//3 FLOP
+		dir.x = pos_body_oth.x - pos_body_cur.x;
+		dir.y = pos_body_oth.y - pos_body_cur.y;
+		dir.z = pos_body_oth.z - pos_body_cur.z;
+		// 6 FLOP
+		float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + epss;
+		// 4 FLOP
+		float partForce = mass_oth / sqrtf(distSqr*distSqr*distSqr);
+		// 6 FLOP
+		velo.x += dir.x * partForce;
+		velo.y += dir.y * partForce;
+		velo.z += dir.z * partForce;
+		return velo;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel for computing velocities
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		device_computeVelocities(float3 *positions, float* masses, float3 *velocities, const int N, float epss) {
+		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
+
+		if (tidx < N) {
+			float3 velo = make_float3(0, 0, 0);
+			for (unsigned int k = 0; k < N; ++k)
+			{
+				// in total 19 FLOP per body body Interaction
+				velo = bodyBodyInteraction(positions[tidx], positions[k], masses[k], epss, velo);
+			}
+
+			velocities[tidx].x += velo.x;
+			velocities[tidx].y += velo.y;
+			velocities[tidx].z += velo.z;
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel for integration step using calculated velocities before
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		device_integrateVelocities(float3 *positions, float3 *velocities, const int N, float dtG) {
+		unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+		if (tid < N) {
+			positions[tid].x += dtG * velocities[tid].x;
+			positions[tid].y += dtG * velocities[tid].y;
+			positions[tid].z += dtG * velocities[tid].z;
+		}
+	}
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,11 +101,10 @@ Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : N(bodies.size()) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Cuda_Computing::~Cuda_Computing() {
 	//free arrays on cuda device
-	checkErrorsCuda(cudaFree(Device::positions));
-	checkErrorsCuda(cudaFree(Device::masses));
-	checkErrorsCuda(cudaFree(Device::velocities));
+	 errorCheckCuda(cudaFree(Device::positions));
+	 errorCheckCuda(cudaFree(Device::masses));
+	 errorCheckCuda(cudaFree(Device::velocities));
 	
-	checkLastCudaError("Error freeing device memory.");
 	// free dynamic arrays
 	delete[] positions;
 	delete[] masses;
@@ -60,7 +119,7 @@ Cuda_Computing::initDevice() {
 	//check execution environment
 	int deviceCount = 0;
 	int device_handle = 0;
-	checkErrorsCuda(cudaGetDeviceCount(&deviceCount));
+	 errorCheckCuda(cudaGetDeviceCount(&deviceCount));
 
 	if (0 == deviceCount) {
 		std::cerr << "initDevice() : No CUDA device found." << std::endl;
@@ -72,22 +131,19 @@ Cuda_Computing::initDevice() {
 	}
 
 	// set the device
-	checkErrorsCuda(cudaSetDevice(device_handle));
+	 errorCheckCuda(cudaSetDevice(device_handle));
 
 	cudaDeviceProp device_props;
-	checkErrorsCuda(cudaGetDeviceProperties(&device_props, device_handle));
+	 errorCheckCuda(cudaGetDeviceProperties(&device_props, device_handle));
 	//std::cout << "Max CC: " << device_props.major << "   Min CC: " << device_props.minor << std::endl;
 
 	// determine thread layout
-	unsigned int max_threads_per_block = 128;
+	threadsPerBlock = 128;
+	numBlocks = N / threadsPerBlock;
+	if(0 != N % threadsPerBlock) numBlocks++;
 
-	num_threads_per_block = std::min(N, max_threads_per_block);
-	num_blocks = N / max_threads_per_block;
-	if (0 != N % max_threads_per_block) {
-		num_blocks++;
-	}
-	std::cout << "num_blocks = " << num_blocks << " :: "
-		<< "num_threads_per_block = " << num_threads_per_block << std::endl;
+	std::cout << "block size = " << numBlocks << " :: "
+		<< "threads per Block = " << threadsPerBlock << std::endl;
 
 	// initialize memory
 	Device::positions = nullptr;
@@ -106,90 +162,31 @@ Cuda_Computing::initDeviceMemory() {
 	Device::velocities = this->velocities;
 
 	// allocate device memory
-	checkErrorsCuda(cudaMalloc((void **)&Device::positions,
+	 errorCheckCuda(cudaMalloc((void **)&Device::positions,
 		N * sizeof(float3))
 	);
-	checkErrorsCuda(cudaMalloc((void **)&Device::masses,
+	 errorCheckCuda(cudaMalloc((void **)&Device::masses,
 		N * sizeof(float))
 	);
-	checkErrorsCuda(cudaMalloc((void **)&Device::velocities,
+	 errorCheckCuda(cudaMalloc((void **)&Device::velocities,
 		N * sizeof(float3))
 	);
 
 	// copy device memory
-	checkErrorsCuda(cudaMemcpy((void *)Device::positions, (void *)positions,
+	 errorCheckCuda(cudaMemcpy((void *)Device::positions, (void *)positions,
 		N * sizeof(float3),
 		cudaMemcpyHostToDevice)
 	);
-	checkErrorsCuda(cudaMemcpy((void *)Device::masses, (void *)masses,
+	 errorCheckCuda(cudaMemcpy((void *)Device::masses, (void *)masses,
 		N * sizeof(float),
 		cudaMemcpyHostToDevice)
 	);
-	checkErrorsCuda(cudaMemcpy((void *)Device::velocities, (void *)velocities,
+	 errorCheckCuda(cudaMemcpy((void *)Device::velocities, (void *)velocities,
 		N * sizeof(float3),
 		cudaMemcpyHostToDevice)
 	);
-	checkLastCudaError("Error initializing device memory.");
+
 	return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// device physics calculations
-////////////////////////////////////////////////////////////////////////////////////////////////////
-__device__
-float3
-bodyBodyInteraction(float3 pos_body_cur, float3 pos_body_oth, float mass_oth, float epss, float3 velo) {
-	float3 dir;
-	//3 FLOP
-	dir.x = pos_body_oth.x - pos_body_cur.x;
-	dir.y = pos_body_oth.y - pos_body_cur.y; 
-	dir.z = pos_body_oth.z - pos_body_cur.z;
-	// 6 FLOP
-	float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + epss;
-	// 4 FLOP
-	float partForce = mass_oth / sqrtf(distSqr*distSqr*distSqr);
-	// 6 FLOP
-	velo.x += dir.x * partForce;
-	velo.y += dir.y * partForce;
-	velo.z += dir.z * partForce;
-	return velo;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// kernel for computing velocities
-////////////////////////////////////////////////////////////////////////////////////////////////////
-__global__
-void
-device_computeVelocities(float3 *positions, float* masses, float3 *velocities, const int N, float epss) {	
-	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (tid < N) {
-		float3 velo = make_float3(0,0,0);
-		for (unsigned int k = 0; k < N; ++k)
-		{
-			// in total 19 FLOP per body body Interaction
-			velo = bodyBodyInteraction(positions[tid], positions[k], masses[k], epss, velo);
-		}
-
-		velocities[tid].x += velo.x;
-		velocities[tid].y += velo.y;
-		velocities[tid].z += velo.z;
-	}	
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// kernel for integration step using calculated velocities before
-////////////////////////////////////////////////////////////////////////////////////////////////////
-__global__
-void
-device_integrateVelocities(float3 *positions, float3 *velocities, const int N, float dtG) {
-	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (tid < N) {
-		positions[tid].x += dtG * velocities[tid].x;
-		positions[tid].y += dtG * velocities[tid].y;
-		positions[tid].z += dtG * velocities[tid].z;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -198,13 +195,16 @@ device_integrateVelocities(float3 *positions, float3 *velocities, const int N, f
 void
 Cuda_Computing::computeForces(float dt) {
 	// run kernel computing velocities
-	device_computeVelocities <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::masses, Device::velocities, N, EPS2);
-	cudaDeviceSynchronize();
-	checkLastCudaError("Kernel 1 error launching.");
+	Device::device_computeVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::masses, Device::velocities, N, EPS2);
+	//used only for error checking
+	/*errorCheckCuda(cudaPeekAtLastError());
+	errorCheckCuda(cudaDeviceSynchronize());*/
+
 	// run kernel integrating velocities
-	device_integrateVelocities <<< num_blocks, num_threads_per_block >> > (Device::positions, Device::velocities, N, dt*G);
-	cudaDeviceSynchronize();
-	checkLastCudaError("Kernel 2 error launching.");
+	Device::device_integrateVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::velocities, N, dt*G);
+	//used only for error checking
+	/*errorCheckCuda(cudaPeekAtLastError());
+	errorCheckCuda(cudaDeviceSynchronize());*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,11 +213,9 @@ Cuda_Computing::computeForces(float dt) {
 void
 Cuda_Computing::copyPositionsFromDevice() {
 	// copy result back to host
-	checkErrorsCuda(cudaMemcpy((void *)positions, (void *)Device::positions,
+	cudaMemcpy((void *)positions, (void *)Device::positions,
 		N * sizeof(float3),
-		cudaMemcpyDeviceToHost)
-	);
-	checkLastCudaError("Error copying from device to host.");
+		cudaMemcpyDeviceToHost);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

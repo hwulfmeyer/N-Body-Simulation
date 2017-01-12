@@ -8,13 +8,21 @@
 #include <iostream>
 #include <algorithm>
 #include "vector_types.h"
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "cuda_util.h"
 #include "body.h"
 
 
+#define errorCheckCuda(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
+{
+	if (code != cudaSuccess)
+	{
+		fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+		if (abort) exit(code);
+	}
+}
 
 class Cuda_Computing {
 public:
@@ -38,19 +46,12 @@ public:
 	size_t getSize() const;
 
 private:
-
-	// number of bodies
-	const size_t N;
-	// array of coords
-	float3 *positions;
-	// array of masses
-	float *masses;
-	// array of velocities
-	float3 *velocities;
-	// threads per block on cuda device
-	unsigned int num_threads_per_block;
-	unsigned int num_blocks;
-
+	const size_t N;					// number of bodies
+	float3 *positions;				// array of coords
+	float *masses;					// array of masses
+	float3 *velocities;				// array of velocities
+	int numBlocks;			// Suggested block size to achieve maximum occupancy.
+	int threadsPerBlock;			// The actual grid size needed, based on input size 
 
 private:
 

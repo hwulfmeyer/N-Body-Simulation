@@ -8,6 +8,8 @@
 #include <string>
 #include <math.h>
 #include "body.h"
+#include <glew.h>
+#include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
 #include "cpu_computing.h"
@@ -29,6 +31,9 @@ starSystem3(std::vector<Body> &bodies);
 void
 starSystem4(std::vector<Body> &bodies);
 
+void
+starSystem4flat(std::vector<Body> &bodies);
+
 int
 main()
 {
@@ -39,7 +44,7 @@ main()
 	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
 	std::vector<Body> bodies;
 	// System
-	starSystem3(bodies);
+	starSystem4flat(bodies);
 	//computing for cpu
 #ifdef CPUPARALLEL
 	Cpu_Computing cpu_computer(bodies);
@@ -70,10 +75,10 @@ main()
 	int frameRuns = 0;
 	float curFPS = 0;
 
-	
-	/// SFML stuff
+
+	/// SFML/openGL stuff
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
-	
+
 	glViewport(0, 0, winWidth, winHeight);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -83,7 +88,17 @@ main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(2);
-	
+
+
+	// create allocation/pointer using OpenGL
+	glewExperimental = GL_TRUE;
+	glewInit();
+	int numVertices = 100;
+	GLuint vertexArray;
+	glGenBuffers(1, &vertexArray);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexArray);
+	glBufferData(GL_ARRAY_BUFFER, numVertices * 16, NULL, GL_DYNAMIC_COPY);
+	//cudaGLRegisterBufferObject( vertexArray );
 
 	// clock for time keeping
 	sf::Clock elapsedTime;
@@ -101,9 +116,7 @@ main()
 				window.close();
 		}
 
-		
-#if 0	// turn drawing on/off
-		//zooming
+		//input stuff
 		if (window.hasFocus()) {
 			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
 				zoomFactor += dt * zoomFactor;
@@ -117,9 +130,12 @@ main()
 				xTranslation += dt * 200;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
 				xTranslation -= dt * 200;
+			if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+				window.close();
+
 		}
 
-
+#if 0	// turn drawing on/off
 		// clear the screen buffer
 		glClearColor(0.1, 0.1, 0.1, 0.1);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -149,10 +165,10 @@ main()
 #ifdef CUDAPARALLEL
 		//compute forces on cuda
 		cuda_computer.computeForces(3e-5f);
-		
-		cuda_computer.copyPositionsFromDevice();
+
+		//cuda_computer.copyPositionsFromDevice();
 #endif
-		
+
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();
 		curFPS = 1.f / dt;
@@ -160,12 +176,9 @@ main()
 		// calculating average fps
 		++frameRuns;
 		avgFPS += (curFPS - avgFPS) / frameRuns;
-		
 	}
 
 	std::cout << "Average FPS: " << avgFPS << std::endl;
-	getchar();
-
 	return 0;
 }
 
@@ -186,14 +199,14 @@ testSystem(std::vector<Body> &bodies)
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
 				Body curBody1(
-					0, 
-					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), 
+					0,
+					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(0, 0, 0)
 				);
 				bodies.push_back(curBody1);
 				Body curBody2(
-					0, 
-					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), 
+					0,
+					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(0, 0, 0)
 				);
 				bodies.push_back(curBody2);
@@ -208,7 +221,7 @@ starSystem1(std::vector<Body> &bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 
-	Body starBody(9e18, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	Body starBody(9e18f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
 	float distance = 300;
 	// fill vector body with bodies
@@ -216,14 +229,14 @@ starSystem1(std::vector<Body> &bodies)
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
 				Body curBody1(
-					2e10, 
-					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance), 
+					2e10,
+					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(2e14, 0, 0)
 				);
 				bodies.push_back(curBody1);
 				Body curBody2(
-					2e10, 
-					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance), 
+					2e10,
+					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(-2e14, 0, 0)
 				);
 				bodies.push_back(curBody2);
@@ -232,12 +245,12 @@ starSystem1(std::vector<Body> &bodies)
 	}
 }
 
-void 
+void
 starSystem2(std::vector<Body>& bodies)
 {
 	unsigned const int numOneSideParticles = 10;
 
-	Body starBody(1.2e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	Body starBody(1.2e19f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
 	float distance = 300;
 	// fill vector body with bodies
@@ -245,25 +258,25 @@ starSystem2(std::vector<Body>& bodies)
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
 				Body curBody1(
-					2e10, 
+					2e10,
 					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(2e14, 0, 0)
 				);
 				bodies.push_back(curBody1);
 				Body curBody2(
-					2e10, 
+					2e10,
 					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(-2e14, 0, 0)
 				);
 				bodies.push_back(curBody2);
 				Body curBody3(
-					2e10, 
+					2e10,
 					starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(0, -2e14, 0)
 				);
 				bodies.push_back(curBody3);
 				Body curBody4(
-					2e10, 
+					2e10,
 					starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(0, 2e14, 0)
 				);
@@ -273,12 +286,12 @@ starSystem2(std::vector<Body>& bodies)
 	}
 }
 
-void 
+void
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 50;
-	float speed = 2e15;
-	Body starBody(6e19, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
+	unsigned const int numOneSideParticles = 13;
+	float speed = 2e15f;
+	Body starBody(6e19f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
 	float distance = 300;
 	// fill vector body with bodies
@@ -286,7 +299,7 @@ starSystem3(std::vector<Body>& bodies)
 		for (int y = 0; y < numOneSideParticles; ++y) {
 			for (int z = 0; z < numOneSideParticles; ++z) {
 				Body curBody1(
-					2e10, 
+					2e10,
 					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(speed, 0, 0)
 				);
@@ -303,7 +316,7 @@ starSystem3(std::vector<Body>& bodies)
 				);
 				bodies.push_back(curBody3);
 				Body curBody4(
-					2e10, 
+					2e10,
 					starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance),
 					glm::vec3(0, speed, 0)
 				);
@@ -315,27 +328,41 @@ starSystem3(std::vector<Body>& bodies)
 
 }
 
-void 
+void
 starSystem4(std::vector<Body>& bodies)
 {
 
-	int radius = 2e5;
-	float angle = 0.0;
-	float angle_stepsize = 0.075;
+	float radius = 2e5f;
+	float angle = 0.0f;
+	float angle_stepsize = 0.075f;
 	int bodies_per_angle = 25;
 
 	// go through all angles from 0 to 2 * PI radians
 	while (angle < 2 * M_PI)
 	{
 		// calculate x, y from a vector with known length and angle
-		int x = radius * cos(angle);
-		int y = radius * sin(angle);
+		float x = radius * cos(angle);
+		float y = radius * sin(angle);
 
 		for (int i = 1; i <= bodies_per_angle; ++i) {
-			Body body(2e16, glm::vec3(x*i/70, y*i/70, 0), glm::vec3(0, 0, 0));
+			Body body(2e16f, glm::vec3(x*i / 70, y*i / 70, 0), glm::vec3(0, 0, 0));
 			bodies.push_back(body);
 		}
 		angle += angle_stepsize;
+	}
+}
+
+void starSystem4flat(std::vector<Body>& bodies)
+{
+	unsigned const int numParticles = 2503;
+	// fill vector body with bodies
+	for (int x = 0; x < numParticles; ++x) {
+		Body curBody1(
+			2e10f,
+			glm::vec3(x,0,0),
+			glm::vec3(0, 0, 0)
+		);
+		bodies.push_back(curBody1);
 	}
 }
 
