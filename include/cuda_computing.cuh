@@ -7,10 +7,15 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
+
+#include "glew.h"
+#include "device_launch_parameters.h"
 #include "vector_types.h"
 #include "cuda.h"
 #include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "cuda_gl_interop.h"
+
+
 #include "body.h"
 
 
@@ -36,6 +41,8 @@ public:
 	bool initDevice();
 
 	bool initDeviceMemory();
+
+	bool initDeviceVertexBuffer();
 
 	void computeForces(float dt);
 

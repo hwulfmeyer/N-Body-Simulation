@@ -7,13 +7,12 @@
 #include <iostream>
 #include <string>
 #include <math.h>
-#include "body.h"
-#include <glew.h>
-#include <SFML/Window.hpp>
+#include "cuda_computing.cuh"
+#include "cpu_computing.h"
+
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
-#include "cpu_computing.h"
-#include "cuda_computing.cuh"
+
 
 
 void
@@ -42,25 +41,6 @@ main()
 
 	// get size
 	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
-	std::vector<Body> bodies;
-	// System
-	starSystem4flat(bodies);
-	//computing for cpu
-#ifdef CPUPARALLEL
-	Cpu_Computing cpu_computer(bodies);
-	cpu_computer.setThreads();
-
-	const float *positions = cpu_computer.getPositions();
-	const size_t sizeBodies = cpu_computer.getSize();
-#endif
-#ifdef CUDAPARALLEL
-	Cuda_Computing cuda_computer(bodies);
-	cuda_computer.initDevice();
-	cuda_computer.initDeviceMemory();
-
-	const float *positions = cuda_computer.getPositions();
-	const size_t sizeBodies = cuda_computer.getSize();
-#endif
 
 	// zoom factor
 	float zoomFactor = 0.05f;
@@ -78,6 +58,56 @@ main()
 
 	/// SFML/openGL stuff
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
+	glewExperimental = GL_TRUE;
+	glewInit();
+
+	std::vector<Body> bodies;
+	// System
+	starSystem4flat(bodies);
+	//computing for cpu
+#ifdef CPUPARALLEL
+	Cpu_Computing cpu_computer(bodies);
+	cpu_computer.setThreads();
+
+	const float *positions = cpu_computer.getPositions();
+	const size_t sizeBodies = cpu_computer.getSize();
+#endif
+#ifdef CUDAPARALLEL
+	Cuda_Computing cuda_computer(bodies);
+	cuda_computer.initDevice();
+	cuda_computer.initDeviceMemory();
+	//cuda_computer.initDeviceVertexBuffer();
+
+	const size_t sizeBodies = cuda_computer.getSize();
+#endif
+
+	// allocate & register the vertexbuffer
+	GLuint vbo;
+	cudaGraphicsResource *cuda_vbo_resource;
+	// device pointer for opengl/cuda inop
+	void* vptr;
+	int N = 200;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	//vertex contain 3 float coords (x,y,z) and 4 color bytes(RGBA) => total 16 bytes per vertex
+	glBufferData(GL_ARRAY_BUFFER, N * 16, NULL, GL_DYNAMIC_COPY);
+
+	//cudaGLRegisterBufferObject(vbo); ///deprecated
+	errorCheckCuda(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, vbo, cudaGraphicsMapFlagsWriteDiscard));
+
+	// Map the buffer to CUDA
+	//cudaGLMapBufferObject(&vptr, vbo); ///deprecated
+	errorCheckCuda(cudaGraphicsMapResources(1, &cuda_vbo_resource));
+	size_t numBytes;
+	errorCheckCuda(cudaGraphicsResourceGetMappedPointer(&vptr, &numBytes, cuda_vbo_resource));
+
+	// execute kernel creating the data
+	//Device::MakeVerticesKernel << < numBlocks, threadsPerBlock >> > (Device::vertexPointer, Device::positions, N);
+
+	// Unmap the buffer
+	//cudaGLUnmapBufferObject(vbo); /// deprecated
+	errorCheckCuda(cudaGraphicsUnmapResources(1, &cuda_vbo_resource));
+
 
 	glViewport(0, 0, winWidth, winHeight);
 	glMatrixMode(GL_PROJECTION);
@@ -88,17 +118,6 @@ main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(2);
-
-
-	// create allocation/pointer using OpenGL
-	glewExperimental = GL_TRUE;
-	glewInit();
-	int numVertices = 100;
-	GLuint vertexArray;
-	glGenBuffers(1, &vertexArray);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexArray);
-	glBufferData(GL_ARRAY_BUFFER, numVertices * 16, NULL, GL_DYNAMIC_COPY);
-	//cudaGLRegisterBufferObject( vertexArray );
 
 	// clock for time keeping
 	sf::Clock elapsedTime;
@@ -135,7 +154,7 @@ main()
 
 		}
 
-#if 0	// turn drawing on/off
+#if 1	// turn drawing on/off
 		// clear the screen buffer
 		glClearColor(0.1, 0.1, 0.1, 0.1);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -147,7 +166,8 @@ main()
 
 		glEnableClientState(GL_VERTEX_ARRAY);
 
-		glVertexPointer(3, GL_FLOAT, 0, positions);
+		glVertexPointer(3, GL_FLOAT, 16, 0);
+		//glColorPointer(4, GL_UNSIGNED_BYTE, 16, 12);
 		glDrawArrays(GL_POINTS, 0, sizeBodies);
 
 		glDisableClientState(GL_VERTEX_ARRAY);

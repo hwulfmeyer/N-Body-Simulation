@@ -12,6 +12,21 @@ namespace Device {
 	float3 *velocities;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel for filling the vertexPointer for opengl/cuda inop
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		MakeVerticesKernel(float4 *vertexPointer, float3 *positions, const unsigned int N) {
+		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
+
+		if (tidx < N) {
+			vertexPointer[tidx].x = positions[tidx].x;
+			vertexPointer[tidx].y = positions[tidx].y;
+			vertexPointer[tidx].z = positions[tidx].z;
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// device physics calculations
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
@@ -38,7 +53,7 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		device_computeVelocities(float3 *positions, float* masses, float3 *velocities, const int N, float epss) {
+		ComputeVelocities(float3 *positions, float* masses, float3 *velocities, const unsigned int N, float epss) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
 		if (tidx < N) {
@@ -60,13 +75,13 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		device_integrateVelocities(float3 *positions, float3 *velocities, const int N, float dtG) {
-		unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+		IntegrateVelocities(float3 *positions, float3 *velocities, const unsigned int N, float dtG) {
+		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
-		if (tid < N) {
-			positions[tid].x += dtG * velocities[tid].x;
-			positions[tid].y += dtG * velocities[tid].y;
-			positions[tid].z += dtG * velocities[tid].z;
+		if (tidx < N) {
+			positions[tidx].x += dtG * velocities[tidx].x;
+			positions[tidx].y += dtG * velocities[tidx].y;
+			positions[tidx].z += dtG * velocities[tidx].z;
 		}
 	}
 
@@ -189,19 +204,31 @@ Cuda_Computing::initDeviceMemory() {
 	return true;
 }
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// creating vertexBuffer for opengl/cuda used for inop between the two
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool
+Cuda_Computing::initDeviceVertexBuffer() {
+
+	return false;
+}
+
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // kernel entry point
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Cuda_Computing::computeForces(float dt) {
 	// run kernel computing velocities
-	Device::device_computeVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::masses, Device::velocities, N, EPS2);
+	Device::ComputeVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::masses, Device::velocities, N, EPS2);
 	//used only for error checking
 	/*errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());*/
 
 	// run kernel integrating velocities
-	Device::device_integrateVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::velocities, N, dt*G);
+	Device::IntegrateVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::velocities, N, dt*G);
 	//used only for error checking
 	/*errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());*/
