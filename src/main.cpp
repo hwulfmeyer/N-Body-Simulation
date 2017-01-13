@@ -76,7 +76,7 @@ main()
 
 	std::vector<Body> bodies;
 	/// System
-	starSystem4flat(bodies);
+	starSystem3(bodies);
 
 	//computing for cpu
 #ifdef CPUPARALLEL
@@ -166,7 +166,7 @@ main()
 		avgFPS += (curFPS - avgFPS) / frameRuns;
 	}
 
-	std::cerr << "Average FPS: " << avgFPS << std::endl;
+	std::cerr << "Average FPS: " << avgFPS << "  ::  gFLOPs: " << avgFPS * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
 	return 0;
 }
 
@@ -277,7 +277,7 @@ starSystem2(std::vector<Body>& bodies)
 void
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 50;
+	unsigned const int numOneSideParticles = 20;
 	float speed = 2e15f;
 	Body starBody(6e19f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);

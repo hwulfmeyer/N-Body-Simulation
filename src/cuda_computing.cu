@@ -22,12 +22,12 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
 		float3
-		bodyBodyInteraction(float3 pos_body_cur, float3 pos_body_oth, float mass_oth, float3 velo) {
+		bodyBodyInteraction(float3 myPos, float3 othPos, float mass_oth, float3 velo) {
 		float3 dir;
 		//3 FLOP
-		dir.x = pos_body_oth.x - pos_body_cur.x;
-		dir.y = pos_body_oth.y - pos_body_cur.y;
-		dir.z = pos_body_oth.z - pos_body_cur.z;
+		dir.x = othPos.x - myPos.x;
+		dir.y = othPos.y - myPos.y;
+		dir.z = othPos.z - myPos.z;
 		// 6 FLOP
 		float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPSILON2;
 		// 4 FLOP
@@ -46,18 +46,21 @@ namespace Device {
 		void
 		ComputeVelocities(float3 *positions, float* masses, float3 *velocities, unsigned int N) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-
 		if (tidx < N) {
-			float3 velo = make_float3(0, 0, 0);
+			float3 myPos = positions[tidx];
+			float3 myVelo = velocities[tidx];
 			for (unsigned int k = 0; k < N; ++k)
 			{
 				// in total 19 FLOP per body body Interaction
-				velo = bodyBodyInteraction(positions[tidx], positions[k], masses[k], velo);
+				myVelo = bodyBodyInteraction(myPos, positions[k], masses[k], myVelo);
 			}
-
-			velocities[tidx].x += velo.x;
-			velocities[tidx].y += velo.y;
-			velocities[tidx].z += velo.z;
+			
+			myPos.x += myVelo.x * DTGRAVITY;
+			myPos.y += myVelo.y * DTGRAVITY;
+			myPos.z += myVelo.z * DTGRAVITY;
+	
+			positions[tidx] = myPos;
+			velocities[tidx] = myVelo;
 		}
 	}
 
@@ -135,12 +138,13 @@ Cuda_Computing::initDevice() {
 	//std::cerr << "Max CC: " << device_props.major << "   Min CC: " << device_props.minor << std::endl;
 
 	// determine thread layout
-	threadsPerBlock = 256;
-	numBlocks = N / threadsPerBlock;
-	if (0 != N % threadsPerBlock) numBlocks++;
+	blockSize = dim3(256, 1, 1);
+	int numBlocks = N / blockSize.x;
+	if (0 != N % blockSize.x) numBlocks++;
+	gridSize = dim3(numBlocks, 1, 1);
 
 	std::cerr << "num blocks = " << numBlocks << " :: "
-		<< "threads per Block = " << threadsPerBlock << std::endl;
+		<< "threads per Block = " << blockSize.x << std::endl;
 
 	float dtG = G*DT;
 
@@ -213,13 +217,14 @@ Cuda_Computing::initVertexBuffer() {
 void
 Cuda_Computing::computeNewPositions() {
 	// run kernel computing velocities
-	Device::ComputeVelocities<< < numBlocks, threadsPerBlock >> > (Device::positions, Device::masses, Device::velocities, N);
+	Device::ComputeVelocities << < gridSize, blockSize >> > (Device::positions, Device::masses, Device::velocities, N);
+
 	//used only for error checking
 	//errorCheckCuda(cudaPeekAtLastError());
 	//errorCheckCuda(cudaDeviceSynchronize());
 
 	// run kernel integrating velocities
-	Device::IntegrateVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::velocities, N);
+	//Device::IntegrateVelocities << < gridSize, blockSize >> > (Device::positions, Device::velocities, N);
 	//used only for error checking
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());

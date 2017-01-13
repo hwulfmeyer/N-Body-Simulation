@@ -48,12 +48,12 @@ public:
 	size_t getSize() const;
 
 private:
-	const int N;					// number of bodies
-	float3 *positions;				// array of coords
-	float *masses;					// array of masses
-	float3 *velocities;				// array of velocities
-	int numBlocks;			// Suggested block size to achieve maximum occupancy.
-	int threadsPerBlock;			// The actual grid size needed, based on input size 
+	const int N;			// number of bodies
+	float3 *positions;		// array of coords
+	float *masses;			// array of masses
+	float3 *velocities;		// array of velocities
+	dim3 gridSize;			// The actual grid size needed, based on input size (num blocks)
+	dim3 blockSize;			// Suggested block size to achieve maximum occupancy.(num threads per block)	
 
 private:
 
