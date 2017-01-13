@@ -64,21 +64,6 @@ namespace Device {
 		}
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel for euler integration using calculated velocities
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	__global__
-		void
-		IntegrateVelocities(float3 *positions, float3 *velocities, unsigned int N) {
-		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-
-		if (tidx < N) {
-			positions[tidx].x += velocities[tidx].x * DTGRAVITY;
-			positions[tidx].y += velocities[tidx].y * DTGRAVITY;
-			positions[tidx].z += velocities[tidx].z * DTGRAVITY;
-		}
-	}
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
