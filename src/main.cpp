@@ -76,7 +76,6 @@ main()
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
 	cuda_computer.initDeviceMemory();
-	//cuda_computer.initDeviceVertexBuffer();
 
 	const size_t sizeBodies = cuda_computer.getSize();
 #endif
@@ -85,12 +84,11 @@ main()
 	GLuint vbo;
 	cudaGraphicsResource *cuda_vbo_resource;
 	// device pointer for opengl/cuda inop
-	void* vptr;
-	int N = 200;
+	float4* vptr;
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	//vertex contain 3 float coords (x,y,z) and 4 color bytes(RGBA) => total 16 bytes per vertex
-	glBufferData(GL_ARRAY_BUFFER, N * 16, NULL, GL_DYNAMIC_COPY);
+	glBufferData(GL_ARRAY_BUFFER, sizeBodies * 16, NULL, GL_DYNAMIC_COPY);
 
 	//cudaGLRegisterBufferObject(vbo); ///deprecated
 	errorCheckCuda(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, vbo, cudaGraphicsMapFlagsWriteDiscard));
@@ -99,10 +97,13 @@ main()
 	//cudaGLMapBufferObject(&vptr, vbo); ///deprecated
 	errorCheckCuda(cudaGraphicsMapResources(1, &cuda_vbo_resource));
 	size_t numBytes;
-	errorCheckCuda(cudaGraphicsResourceGetMappedPointer(&vptr, &numBytes, cuda_vbo_resource));
+	errorCheckCuda(cudaGraphicsResourceGetMappedPointer((void**)&vptr, &numBytes, cuda_vbo_resource));
 
 	// execute kernel creating the data
-	//Device::MakeVerticesKernel << < numBlocks, threadsPerBlock >> > (Device::vertexPointer, Device::positions, N);
+
+#ifdef CUDAPARALLEL
+	cuda_computer.initDeviceVertexBuffer(vptr);
+#endif
 
 	// Unmap the buffer
 	//cudaGLUnmapBufferObject(vbo); /// deprecated

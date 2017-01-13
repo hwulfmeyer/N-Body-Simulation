@@ -42,7 +42,7 @@ public:
 
 	bool initDeviceMemory();
 
-	bool initDeviceVertexBuffer();
+	bool initDeviceVertexBuffer(float4* vptr);
 
 	void computeForces(float dt);
 

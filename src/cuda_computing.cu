@@ -10,6 +10,8 @@ namespace Device {
 	float *masses;
 	// array of velocities
 	float3 *velocities;
+	// vertexBuffer for device
+	float4 *vertexBuffer;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// kernel for filling the vertexPointer for opengl/cuda inop
@@ -209,9 +211,10 @@ Cuda_Computing::initDeviceMemory() {
 // creating vertexBuffer for opengl/cuda used for inop between the two
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool
-Cuda_Computing::initDeviceVertexBuffer() {
-
-	return false;
+Cuda_Computing::initDeviceVertexBuffer(float4* vptr) {
+	Device::vertexBuffer = vptr;
+	Device::MakeVerticesKernel << < numBlocks, threadsPerBlock >> > (Device::vertexBuffer, Device::positions, N);
+	return true;
 }
 
 
