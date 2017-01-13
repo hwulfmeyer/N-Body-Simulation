@@ -18,7 +18,6 @@
 
 #include "body.h"
 
-
 #define errorCheckCuda(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
 {
@@ -40,20 +39,16 @@ public:
 
 	bool initDevice();
 
-	bool initDeviceMemory();
+	bool initVertexBuffer();
 
-	bool initDeviceVertexBuffer();
-
-	void computeNewPositions(float dt);
-
-	void copyPositionsFromDevice();
+	void computeNewPositions();
 
 	const float *getPositions() const;
 
 	size_t getSize() const;
 
 private:
-	const size_t N;					// number of bodies
+	const int N;					// number of bodies
 	float3 *positions;				// array of coords
 	float *masses;					// array of masses
 	float3 *velocities;				// array of velocities

@@ -89,8 +89,7 @@ main()
 #ifdef CUDAPARALLEL
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
-	cuda_computer.initDeviceMemory();
-	cuda_computer.initDeviceVertexBuffer();
+	cuda_computer.initVertexBuffer();
 
 	const size_t sizeBodies = cuda_computer.getSize();
 #endif
@@ -155,7 +154,7 @@ main()
 #endif
 #ifdef CUDAPARALLEL
 		//compute forces on cuda
-		cuda_computer.computeNewPositions(3e-5f);
+		cuda_computer.computeNewPositions();
 #endif
 
 		// time measurement
@@ -343,7 +342,7 @@ starSystem4(std::vector<Body>& bodies)
 
 void starSystem4flat(std::vector<Body>& bodies)
 {
-	unsigned const int numParticles = 50000;
+	unsigned const int numParticles = 30000;
 	// fill vector body with bodies
 	for (int x = 0; x < numParticles; ++x) {
 		Body curBody1(
