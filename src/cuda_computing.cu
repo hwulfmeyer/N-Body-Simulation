@@ -4,29 +4,12 @@
 #include "cuda_computing.cuh"
 
 namespace Device {
-	// array of coords
-	float3 *positions;
 	// array of masses
 	float *masses;
 	// array of velocities
 	float3 *velocities;
 	// vertexBuffer for device
-	float4 *vertexBuffer;
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel for filling the vertexPointer for opengl/cuda inop
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	__global__
-		void
-		MakeVerticesKernel(float4 *vertexPointer, float3 *positions, const unsigned int N) {
-		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-
-		if (tidx < N) {
-			vertexPointer[tidx].x = positions[tidx].x;
-			vertexPointer[tidx].y = positions[tidx].y;
-			vertexPointer[tidx].z = positions[tidx].z;
-		}
-	}
+	float3 *vertexBuffer;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// device physics calculations
@@ -73,7 +56,7 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel for integration step using calculated velocities before
+	// kernel for euler integration using calculated velocities
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
@@ -110,7 +93,7 @@ Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : N(bodies.size()) {
 		velocities[i].z = bodies[i].velocity.z;
 	}
 
-	std::cout << "Cuda_Computing::Cuda_Computing() - Copying of " << N << " bodies done." << std::endl;
+	std::cerr << "Cuda_Computing::Cuda_Computing() - Copying of " << N << " bodies done." << std::endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,9 +101,9 @@ Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : N(bodies.size()) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Cuda_Computing::~Cuda_Computing() {
 	//free arrays on cuda device
-	 errorCheckCuda(cudaFree(Device::positions));
-	 errorCheckCuda(cudaFree(Device::masses));
-	 errorCheckCuda(cudaFree(Device::velocities));
+	//errorCheckCuda(cudaDeviceSynchronize());
+	errorCheckCuda(cudaFree((void *)Device::masses));
+	errorCheckCuda(cudaFree((void *)Device::velocities));
 	
 	// free dynamic arrays
 	delete[] positions;
@@ -152,18 +135,17 @@ Cuda_Computing::initDevice() {
 
 	cudaDeviceProp device_props;
 	 errorCheckCuda(cudaGetDeviceProperties(&device_props, device_handle));
-	//std::cout << "Max CC: " << device_props.major << "   Min CC: " << device_props.minor << std::endl;
+	//std::cerr << "Max CC: " << device_props.major << "   Min CC: " << device_props.minor << std::endl;
 
 	// determine thread layout
-	threadsPerBlock = 128;
+	threadsPerBlock = 256;
 	numBlocks = N / threadsPerBlock;
 	if(0 != N % threadsPerBlock) numBlocks++;
 
-	std::cout << "block size = " << numBlocks << " :: "
+	std::cerr << "block size = " << numBlocks << " :: "
 		<< "threads per Block = " << threadsPerBlock << std::endl;
 
 	// initialize memory
-	Device::positions = nullptr;
 	Device::masses = nullptr;
 	Device::velocities = nullptr;
 	return true;
@@ -174,14 +156,10 @@ Cuda_Computing::initDevice() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool
 Cuda_Computing::initDeviceMemory() {
-	Device::positions = this->positions;
 	Device::masses = this->masses;
 	Device::velocities = this->velocities;
 
 	// allocate device memory
-	 errorCheckCuda(cudaMalloc((void **)&Device::positions,
-		N * sizeof(float3))
-	);
 	 errorCheckCuda(cudaMalloc((void **)&Device::masses,
 		N * sizeof(float))
 	);
@@ -190,10 +168,6 @@ Cuda_Computing::initDeviceMemory() {
 	);
 
 	// copy device memory
-	 errorCheckCuda(cudaMemcpy((void *)Device::positions, (void *)positions,
-		N * sizeof(float3),
-		cudaMemcpyHostToDevice)
-	);
 	 errorCheckCuda(cudaMemcpy((void *)Device::masses, (void *)masses,
 		N * sizeof(float),
 		cudaMemcpyHostToDevice)
@@ -208,7 +182,7 @@ Cuda_Computing::initDeviceMemory() {
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// creating vertexBuffer for opengl/cuda used for inop between the two
+// creating vertexBuffer for openGL/cuda inop
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool
 Cuda_Computing::initDeviceVertexBuffer() {
@@ -218,19 +192,17 @@ Cuda_Computing::initDeviceVertexBuffer() {
 	// device pointer for opengl/cuda inop
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	//vertex contain 3 float coords (x,y,z) and 4 color bytes(RGBA) => total 16 bytes per vertex
-	glBufferData(GL_ARRAY_BUFFER, N * 16, NULL, GL_DYNAMIC_COPY);
+	// buffer data with our positions
+	glBufferData(GL_ARRAY_BUFFER, N * sizeof(float3), positions, GL_DYNAMIC_COPY);
 
 	//cudaGLRegisterBufferObject(vbo); ///deprecated
-	errorCheckCuda(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, vbo, cudaGraphicsMapFlagsWriteDiscard));
+	errorCheckCuda(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, vbo, cudaGraphicsMapFlagsNone));
 
 	// Map the buffer to CUDA
 	//cudaGLMapBufferObject(&vptr, vbo); ///deprecated
 	errorCheckCuda(cudaGraphicsMapResources(1, &cuda_vbo_resource));
 	size_t numBytes;
 	errorCheckCuda(cudaGraphicsResourceGetMappedPointer((void**)&Device::vertexBuffer, &numBytes, cuda_vbo_resource));
-
-	Device::MakeVerticesKernel << < numBlocks, threadsPerBlock >> > (Device::vertexBuffer, Device::positions, N);
 
 	// Unmap the buffer
 	//cudaGLUnmapBufferObject(vbo); /// deprecated
@@ -244,29 +216,26 @@ Cuda_Computing::initDeviceVertexBuffer() {
 // kernel entry point
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-Cuda_Computing::computeForces(float dt) {
+Cuda_Computing::computeNewPositions(float dt) {
 	// run kernel computing velocities
-	Device::ComputeVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::masses, Device::velocities, N, EPS2);
+	Device::ComputeVelocities << < numBlocks, threadsPerBlock >> > (Device::vertexBuffer, Device::masses, Device::velocities, N, EPS2);
 	//used only for error checking
-	/*errorCheckCuda(cudaPeekAtLastError());
-	errorCheckCuda(cudaDeviceSynchronize());*/
+	//errorCheckCuda(cudaPeekAtLastError());
+	//errorCheckCuda(cudaDeviceSynchronize());
 
 	// run kernel integrating velocities
-	Device::IntegrateVelocities << < numBlocks, threadsPerBlock >> > (Device::positions, Device::velocities, N, dt*G);
+	Device::IntegrateVelocities << < numBlocks, threadsPerBlock >> > (Device::vertexBuffer, Device::velocities, N, dt*G);
 	//used only for error checking
-	/*errorCheckCuda(cudaPeekAtLastError());
-	errorCheckCuda(cudaDeviceSynchronize());*/
+	//errorCheckCuda(cudaPeekAtLastError());
+	errorCheckCuda(cudaDeviceSynchronize());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// copying from device to host (with openGL inop not necessary)
+// copying from device to host (with openGL/cuda inop not necessary)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Cuda_Computing::copyPositionsFromDevice() {
 	// copy result back to host
-	cudaMemcpy((void *)positions, (void *)Device::positions,
-		N * sizeof(float3),
-		cudaMemcpyDeviceToHost);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

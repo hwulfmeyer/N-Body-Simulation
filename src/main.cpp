@@ -39,9 +39,6 @@ main()
 	unsigned const int winWidth = 1280;
 	unsigned const int winHeight = 768;
 
-	// get size
-	//std::cout << "Max Size: " << SIZE_MAX << std::endl;
-
 	// zoom factor
 	float zoomFactor = 0.05f;
 	// time between frames
@@ -55,15 +52,32 @@ main()
 	int frameRuns = 0;
 	float curFPS = 0;
 
-
 	/// SFML/openGL stuff
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
 	glewExperimental = GL_TRUE;
 	glewInit();
 
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+	glViewport(0, 0, winWidth, winHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, winWidth, winHeight, 0, -1 * 1e8, 1e8);
+	glEnable(GL_POINT_SMOOTH);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glPointSize(2);
+
+	// clock for time keeping
+	sf::Clock elapsedTime;
+	sf::Event event;
+
+
 	std::vector<Body> bodies;
-	// System
+	/// System
 	starSystem4flat(bodies);
+
 	//computing for cpu
 #ifdef CPUPARALLEL
 	Cpu_Computing cpu_computer(bodies);
@@ -81,22 +95,8 @@ main()
 	const size_t sizeBodies = cuda_computer.getSize();
 #endif
 
-	glViewport(0, 0, winWidth, winHeight);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, winWidth, winHeight, 0, -1 * 1e8, 1e8);
-
-	glEnable(GL_POINT_SMOOTH);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glPointSize(2);
-
-	// clock for time keeping
-	sf::Clock elapsedTime;
-	sf::Event event;
 
 	elapsedTime.restart();
-
 	// window loop
 	while (window.isOpen())
 	{
@@ -138,8 +138,7 @@ main()
 
 		glEnableClientState(GL_VERTEX_ARRAY);
 
-		glVertexPointer(3, GL_FLOAT, 16, 0);
-		//glColorPointer(4, GL_UNSIGNED_BYTE, 16, 12);
+		glVertexPointer(3, GL_FLOAT, sizeof(float3), 0);
 		glDrawArrays(GL_POINTS, 0, sizeBodies);
 
 		glDisableClientState(GL_VERTEX_ARRAY);
@@ -156,9 +155,7 @@ main()
 #endif
 #ifdef CUDAPARALLEL
 		//compute forces on cuda
-		cuda_computer.computeForces(3e-5f);
-
-		//cuda_computer.copyPositionsFromDevice();
+		cuda_computer.computeNewPositions(3e-5f);
 #endif
 
 		// time measurement
@@ -170,7 +167,7 @@ main()
 		avgFPS += (curFPS - avgFPS) / frameRuns;
 	}
 
-	std::cout << "Average FPS: " << avgFPS << std::endl;
+	std::cerr << "Average FPS: " << avgFPS << std::endl;
 	return 0;
 }
 
@@ -281,7 +278,7 @@ starSystem2(std::vector<Body>& bodies)
 void
 starSystem3(std::vector<Body>& bodies)
 {
-	unsigned const int numOneSideParticles = 13;
+	unsigned const int numOneSideParticles = 50;
 	float speed = 2e15f;
 	Body starBody(6e19f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
 	bodies.push_back(starBody);
@@ -346,12 +343,12 @@ starSystem4(std::vector<Body>& bodies)
 
 void starSystem4flat(std::vector<Body>& bodies)
 {
-	unsigned const int numParticles = 2503;
+	unsigned const int numParticles = 50000;
 	// fill vector body with bodies
 	for (int x = 0; x < numParticles; ++x) {
 		Body curBody1(
-			2e10f,
-			glm::vec3(x,0,0),
+			2e16f,
+			glm::vec3(x*10,0,0),
 			glm::vec3(0, 0, 0)
 		);
 		bodies.push_back(curBody1);

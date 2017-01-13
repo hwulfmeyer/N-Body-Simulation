@@ -44,7 +44,7 @@ public:
 
 	bool initDeviceVertexBuffer();
 
-	void computeForces(float dt);
+	void computeNewPositions(float dt);
 
 	void copyPositionsFromDevice();
 
