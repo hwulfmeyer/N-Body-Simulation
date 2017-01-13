@@ -48,9 +48,13 @@ main()
 	// translation
 	float xTranslation = 10;
 	float yTranslation = 10;
+	//fpscounter etc.
 	float avgFPS = 0;
 	int frameRuns = 0;
 	float curFPS = 0;
+	// clock for time keeping
+	sf::Clock elapsedTime;
+	sf::Event event;
 
 	/// SFML/openGL stuff
 	sf::Window window(sf::VideoMode(winWidth, winHeight), "N-Body Simulation");
@@ -69,31 +73,14 @@ main()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPointSize(2);
 
-	// clock for time keeping
-	sf::Clock elapsedTime;
-	sf::Event event;
 
-
+	//setup cuda etc.
 	std::vector<Body> bodies;
-	/// System
 	starSystem3(bodies);
-
-	//computing for cpu
-#ifdef CPUPARALLEL
-	Cpu_Computing cpu_computer(bodies);
-	cpu_computer.setThreads();
-
-	const float *positions = cpu_computer.getPositions();
-	const size_t sizeBodies = cpu_computer.getSize();
-#endif
-#ifdef CUDAPARALLEL
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
 	cuda_computer.initVertexBuffer();
-
 	const size_t sizeBodies = cuda_computer.getSize();
-#endif
-
 
 	elapsedTime.restart();
 	// window loop
@@ -149,13 +136,7 @@ main()
 #endif
 
 		/// nbody calculations
-#ifdef CPUPARALLEL
-		cpu_computer.compute_forces(3e-5f);
-#endif
-#ifdef CUDAPARALLEL
-		//compute forces on cuda
 		cuda_computer.computeNewPositions();
-#endif
 
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();

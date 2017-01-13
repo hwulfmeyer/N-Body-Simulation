@@ -203,24 +203,9 @@ void
 Cuda_Computing::computeNewPositions() {
 	// run kernel computing velocities
 	Device::ComputeVelocities << < gridSize, blockSize >> > (Device::positions, Device::masses, Device::velocities, N);
-
-	//used only for error checking
-	//errorCheckCuda(cudaPeekAtLastError());
-	//errorCheckCuda(cudaDeviceSynchronize());
-
-	// run kernel integrating velocities
-	//Device::IntegrateVelocities << < gridSize, blockSize >> > (Device::positions, Device::velocities, N);
 	//used only for error checking
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// returns positions as flat array 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-const float *
-Cuda_Computing::getPositions() const {
-	return nullptr;
 }
 
 

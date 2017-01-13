@@ -43,8 +43,6 @@ public:
 
 	void computeNewPositions();
 
-	const float *getPositions() const;
-
 	size_t getSize() const;
 
 private:
