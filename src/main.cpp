@@ -76,39 +76,10 @@ main()
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
 	cuda_computer.initDeviceMemory();
+	cuda_computer.initDeviceVertexBuffer();
 
 	const size_t sizeBodies = cuda_computer.getSize();
 #endif
-
-	// allocate & register the vertexbuffer
-	GLuint vbo;
-	cudaGraphicsResource *cuda_vbo_resource;
-	// device pointer for opengl/cuda inop
-	float4* vptr;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	//vertex contain 3 float coords (x,y,z) and 4 color bytes(RGBA) => total 16 bytes per vertex
-	glBufferData(GL_ARRAY_BUFFER, sizeBodies * 16, NULL, GL_DYNAMIC_COPY);
-
-	//cudaGLRegisterBufferObject(vbo); ///deprecated
-	errorCheckCuda(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, vbo, cudaGraphicsMapFlagsWriteDiscard));
-
-	// Map the buffer to CUDA
-	//cudaGLMapBufferObject(&vptr, vbo); ///deprecated
-	errorCheckCuda(cudaGraphicsMapResources(1, &cuda_vbo_resource));
-	size_t numBytes;
-	errorCheckCuda(cudaGraphicsResourceGetMappedPointer((void**)&vptr, &numBytes, cuda_vbo_resource));
-
-	// execute kernel creating the data
-
-#ifdef CUDAPARALLEL
-	cuda_computer.initDeviceVertexBuffer(vptr);
-#endif
-
-	// Unmap the buffer
-	//cudaGLUnmapBufferObject(vbo); /// deprecated
-	errorCheckCuda(cudaGraphicsUnmapResources(1, &cuda_vbo_resource));
-
 
 	glViewport(0, 0, winWidth, winHeight);
 	glMatrixMode(GL_PROJECTION);

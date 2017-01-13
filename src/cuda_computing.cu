@@ -211,9 +211,30 @@ Cuda_Computing::initDeviceMemory() {
 // creating vertexBuffer for opengl/cuda used for inop between the two
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool
-Cuda_Computing::initDeviceVertexBuffer(float4* vptr) {
-	Device::vertexBuffer = vptr;
+Cuda_Computing::initDeviceVertexBuffer() {
+	// allocate & register the vertexbuffer
+	GLuint vbo;
+	cudaGraphicsResource *cuda_vbo_resource;
+	// device pointer for opengl/cuda inop
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	//vertex contain 3 float coords (x,y,z) and 4 color bytes(RGBA) => total 16 bytes per vertex
+	glBufferData(GL_ARRAY_BUFFER, N * 16, NULL, GL_DYNAMIC_COPY);
+
+	//cudaGLRegisterBufferObject(vbo); ///deprecated
+	errorCheckCuda(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, vbo, cudaGraphicsMapFlagsWriteDiscard));
+
+	// Map the buffer to CUDA
+	//cudaGLMapBufferObject(&vptr, vbo); ///deprecated
+	errorCheckCuda(cudaGraphicsMapResources(1, &cuda_vbo_resource));
+	size_t numBytes;
+	errorCheckCuda(cudaGraphicsResourceGetMappedPointer((void**)&Device::vertexBuffer, &numBytes, cuda_vbo_resource));
+
 	Device::MakeVerticesKernel << < numBlocks, threadsPerBlock >> > (Device::vertexBuffer, Device::positions, N);
+
+	// Unmap the buffer
+	//cudaGLUnmapBufferObject(vbo); /// deprecated
+	errorCheckCuda(cudaGraphicsUnmapResources(1, &cuda_vbo_resource));
 	return true;
 }
 
