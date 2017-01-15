@@ -52,6 +52,7 @@ main()
 	float avgFPS = 0;
 	int frameRuns = 0;
 	float curFPS = 0;
+	bool isComputing = true;
 	// clock for time keeping
 	sf::Clock elapsedTime;
 	sf::Event event;
@@ -76,7 +77,7 @@ main()
 
 	//setup cuda etc.
 	std::vector<Body> bodies;
-	starSystem3(bodies);
+	starSystem4flat(bodies); /// system
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
 	cuda_computer.initVertexBuffer();
@@ -109,7 +110,8 @@ main()
 				xTranslation -= dt * 200;
 			if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
 				window.close();
-
+			if (!isComputing && sf::Keyboard::isKeyPressed(sf::Keyboard::B))
+				isComputing = true;
 		}
 
 #if 1	// turn drawing on/off
@@ -135,16 +137,21 @@ main()
 		window.display();
 #endif
 
-		/// nbody calculations
-		cuda_computer.computeNewPositions();
+		if (isComputing) {
+			/// nbody calculations
+			cuda_computer.computeNewPositions();
+		}
 
 		// time measurement
 		dt = elapsedTime.restart().asSeconds();
 		curFPS = 1.f / dt;
 		window.setTitle(std::to_string(int(curFPS)) + " FPS");
-		// calculating average fps
-		++frameRuns;
-		avgFPS += (curFPS - avgFPS) / frameRuns;
+
+		if (isComputing) {
+			// calculating average fps
+			++frameRuns;
+			avgFPS += (curFPS - avgFPS) / frameRuns;
+		}
 	}
 
 	std::cerr << "Average FPS: " << avgFPS << "  ::  gFLOPs: " << avgFPS * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
@@ -321,14 +328,21 @@ starSystem4(std::vector<Body>& bodies)
 	}
 }
 
-void starSystem4flat(std::vector<Body>& bodies)
+void 
+starSystem4flat(std::vector<Body>& bodies)
 {
-	unsigned const int numParticles = 30000;
+	unsigned const int numParticles = 131072; //131072;
 	// fill vector body with bodies
-	for (int x = 0; x < numParticles; ++x) {
+	for (int i=0,x=0,y=0; i < numParticles; ++i, ++x) {
+		if (x > 768) {
+			++y;
+			x = 0;
+		}
+		glm::vec3 pos = glm::vec3(x * 30, y * 40, 0) + glm::vec3(400,400,0);
+
 		Body curBody1(
 			2e16f,
-			glm::vec3(x*10,0,0),
+			pos,
 			glm::vec3(0, 0, 0)
 		);
 		bodies.push_back(curBody1);

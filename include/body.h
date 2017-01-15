@@ -8,7 +8,7 @@
 static const float G = 6.67408e-11f;	// gravitational constant
 static const float EPS = 3e1f;
 static const float EPS2 = EPS*EPS;
-static const float DT = 3e-5f;
+static const float DT = 3e-6f;
 
 class Body {
 
