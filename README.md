@@ -4,7 +4,7 @@ For parallel computing on CPU & CUDA.
 
 ### Simulation Setup
 
-The classical N-body problem simulates the evolution of a system of N bodies, where the force exerted on each body arises due to its interaction with all the other bodies in the system.
+The classical N-body problem simulates the evolution of a system of N bodies, where the force exerted on each body arises due to its interaction with all the other bodies in the system. It is using newtons gravitational laws.
 
 
 Infomaterial:
@@ -16,7 +16,7 @@ Infomaterial:
 
 ### The Algorithm
 
-The naive implementation calculates each force for each object from all objects. It's called all-pairs-agorithm or brute force method and has a complexity of O(N^2), however it gives the most correct results.
+The naive implementation computates each force for each object from all objects. It's called all-pairs-agorithm or brute force method and has a complexity of O(N^2), however it gives the most correct results.
 
 See https://en.wikipedia.org/wiki/N-body_problem#General_formulation
 
@@ -64,11 +64,20 @@ With softening factor & simplification:
 Drawing is done with OpenGL.
 
 Libraries (https://www.opengl.org/wiki/Related_toolkits_and_APIs)
+
 UI: http://anttweakbar.sourceforge.net/doc/
 
-### Algorithm Optimization
+## Project Timeline
+1. Program on single threaded CPU       [DONE]
+2. porting to multithreaded CPU         [DONE]
+3. naive algorithm on CUDA              [DONE]
+4. utilize OpenGL & Cuda inoperability  [DONE]
+5. CUDA performance optimizations       [TODO]
+6. create better & 3D particles/world   [TODO]
+7. integrate AntTweakBar                [TODO]
 
-__TODO__
+### Algorithm Optimization/Approximation methods
+
 https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation
 
 
