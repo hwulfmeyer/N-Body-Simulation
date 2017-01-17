@@ -35,7 +35,7 @@ public:
 	Cuda_Computing(std::vector<Body> &bodies);
 
 	//destructor
-	~Cuda_Computing();
+	~Cuda_Computing() {};
 
 	bool initDevice();
 
@@ -51,7 +51,8 @@ private:
 	float *masses;			// array of masses
 	float3 *velocities;		// array of velocities
 	dim3 gridSize;			// The actual grid size needed, based on input size (num blocks)
-	dim3 blockSize;			// Suggested block size to achieve maximum occupancy.(num threads per block)	
+	dim3 blockSize;			// Suggested block size to achieve maximum occupancy.(num threads per block)
+	int numThreadsPerBlock;
 
 private:
 

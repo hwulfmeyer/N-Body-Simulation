@@ -4,6 +4,7 @@
 #define _USE_MATH_DEFINES
 #define CUDAPARALLEL
 
+
 #include <iostream>
 #include <string>
 #include <math.h>
@@ -12,7 +13,6 @@
 
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
-
 
 
 void
@@ -31,7 +31,7 @@ void
 starSystem4(std::vector<Body> &bodies);
 
 void
-starSystem4flat(std::vector<Body> &bodies);
+starSystemFlat(std::vector<Body> &bodies);
 
 int
 main()
@@ -77,7 +77,7 @@ main()
 
 	//setup cuda etc.
 	std::vector<Body> bodies;
-	starSystem4flat(bodies); /// system
+	starSystemFlat(bodies); /// system
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
 	cuda_computer.initVertexBuffer();
@@ -190,7 +190,6 @@ testSystem(std::vector<Body> &bodies)
 		}
 	}
 }
-
 
 void
 starSystem1(std::vector<Body> &bodies)
@@ -329,9 +328,9 @@ starSystem4(std::vector<Body>& bodies)
 }
 
 void 
-starSystem4flat(std::vector<Body>& bodies)
+starSystemFlat(std::vector<Body>& bodies)
 {
-	unsigned const int numParticles = 131072; //131072;
+	unsigned const int numParticles = 16384/2; //131072;
 	// fill vector body with bodies
 	for (int i=0,x=0,y=0; i < numParticles; ++i, ++x) {
 		if (x > 768) {

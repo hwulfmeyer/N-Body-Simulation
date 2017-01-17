@@ -9,6 +9,8 @@ namespace Device {
 		float EPSILON2;
 	__device__ __constant__
 		float DTGRAVITY;
+	__device__ __constant__
+		int BLOCKSIZE;
 
 	// array of masses
 	float *masses;
@@ -18,7 +20,9 @@ namespace Device {
 	float3 *positions;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// device physics calculations
+	// physics calculations between bodies
+	// NOTES: try not using EPSILON for calculations
+	// NOTES: more than one particle in one thread
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
 		float3
@@ -36,22 +40,22 @@ namespace Device {
 		velo.x += dir.x * partForce;
 		velo.y += dir.y * partForce;
 		velo.z += dir.z * partForce;
+		// in total 19 FLOP per body body Interaction
 		return velo;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel for computing velocities
+	// kernel computing velocities
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		ComputeVelocities(float3 *positions, float* masses, float3 *velocities, unsigned int N) {
+		computeVelocities(float3 *positions, float* masses, float3 *velocities, unsigned int N) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 		if (tidx < N) {
 			float3 myPos = positions[tidx];
 			float3 myVelo = velocities[tidx];
 			for (unsigned int k = 0; k < N; ++k)
 			{
-				// in total 19 FLOP per body body Interaction
 				myVelo = bodyBodyInteraction(myPos, positions[k], masses[k], myVelo);
 			}
 			
@@ -64,10 +68,80 @@ namespace Device {
 		}
 	}
 
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// physics calculations between bodies [SHARED MEMORY]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__device__
+		float3
+		smBodyBodyInteraction(float3 myPos, float4 othPos, float3 velo) {
+		float3 dir;
+		//3 FLOP
+		dir.x = othPos.x - myPos.x;
+		dir.y = othPos.y - myPos.y;
+		dir.z = othPos.z - myPos.z;
+		// 6 FLOP
+		float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPSILON2;
+		// 4 FLOP
+		float partForce = othPos.w / sqrtf(distSqr*distSqr*distSqr);
+		// 6 FLOP
+		velo.x += dir.x * partForce;
+		velo.y += dir.y * partForce;
+		velo.z += dir.z * partForce;
+		return velo;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// physics calculations between bodies in a tile [SHARED MEMORY]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__device__ float3 smTileCalculation(float3 myPos, float3 velo)
+	{
+		extern __shared__ float4 smPos[];
+
+		for (unsigned int i = 0; i < BLOCKSIZE; i++)
+		{
+			velo = smBodyBodyInteraction(myPos, smPos[i], velo);
+		}
+
+		return velo;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel using shared Memory computing velocities
+	// NVS4200M has 48KB of SM per SMP meaning 1 block on one SMP uses that much, 2 blocks split the 48KB...
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		smComputeVelocities(float3 *positions, float* masses, float3 *velocities, unsigned int N) {
+		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
+		extern __shared__ float4 smPos[];
+
+		if (tidx < N) {
+			float3 myPos = positions[tidx];
+			float3 myVelo = velocities[tidx];
+
+			for (int i = 0, tile = 0; i < N; i += BLOCKSIZE, tile++) {
+				int idx = tile * blockDim.x + threadIdx.x;
+				smPos[threadIdx.x].x = positions[idx].x;
+				smPos[threadIdx.x].y = positions[idx].y;
+				smPos[threadIdx.x].z = positions[idx].z;
+				smPos[threadIdx.x].w = masses[idx];
+				__syncthreads();
+				myVelo = smTileCalculation(myPos, myVelo);
+				__syncthreads();
+			}
+			myPos.x += myVelo.x * DTGRAVITY;
+			myPos.y += myVelo.y * DTGRAVITY;
+			myPos.z += myVelo.z * DTGRAVITY;
+
+			positions[tidx] = myPos;
+			velocities[tidx] = myVelo;
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// constructor, copies all the stuff to this class
+// constructor, copies all the bodies into this class
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : N(bodies.size()) {
 	this->positions = new float3[N];
@@ -90,11 +164,6 @@ Cuda_Computing::Cuda_Computing(std::vector<Body> &bodies) : N(bodies.size()) {
 	std::cerr << "Cuda_Computing::Cuda_Computing() - Copying of " << N << " bodies done." << std::endl;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// destructor, deletes our dynamic arrays & frees memory on cuda device
-////////////////////////////////////////////////////////////////////////////////////////////////////
-Cuda_Computing::~Cuda_Computing() {
-};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // initializes device, detects hardware, number of threads per block
@@ -123,9 +192,12 @@ Cuda_Computing::initDevice() {
 	//std::cerr << "Max CC: " << device_props.major << "   Min CC: " << device_props.minor << std::endl;
 
 	// determine thread layout
+	// num of threads on 1 block, thread layout per block
 	blockSize = dim3(256, 1, 1);
-	int numBlocks = N / blockSize.x;
+	numThreadsPerBlock = blockSize.x*blockSize.y*blockSize.z;
+	int numBlocks = N / numThreadsPerBlock;
 	if (0 != N % blockSize.x) numBlocks++;
+	// number of blocks, block layout on grid
 	gridSize = dim3(numBlocks, 1, 1);
 
 	std::cerr << "num blocks = " << numBlocks << " :: "
@@ -135,6 +207,7 @@ Cuda_Computing::initDevice() {
 
 	errorCheckCuda(cudaMemcpyToSymbol(Device::EPSILON2, &EPS2, sizeof(float), 0, cudaMemcpyHostToDevice));
 	errorCheckCuda(cudaMemcpyToSymbol(Device::DTGRAVITY, &dtG, sizeof(float), 0, cudaMemcpyHostToDevice));
+	errorCheckCuda(cudaMemcpyToSymbol(Device::BLOCKSIZE, &numThreadsPerBlock, sizeof(float), 0, cudaMemcpyHostToDevice));
 	return true;
 }
 
@@ -195,14 +268,16 @@ Cuda_Computing::initVertexBuffer() {
 }
 
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // kernel entry point
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
 Cuda_Computing::computeNewPositions() {
 	// run kernel computing velocities
-	Device::ComputeVelocities << < gridSize, blockSize >> > (Device::positions, Device::masses, Device::velocities, N);
+	//Device::computeVelocities << < gridSize, blockSize, 
+	//	>> > (Device::positions, Device::masses, Device::velocities, N);
+	Device::computeVelocities << < gridSize, blockSize, sizeof(float4)*numThreadsPerBlock 
+		>> > (Device::positions, Device::masses, Device::velocities, N);
 	//used only for error checking
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
