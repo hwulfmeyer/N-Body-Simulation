@@ -276,7 +276,7 @@ Cuda_Computing::computeNewPositions() {
 	// run kernel computing velocities
 	//Device::computeVelocities << < gridSize, blockSize, 
 	//	>> > (Device::positions, Device::masses, Device::velocities, N);
-	Device::computeVelocities << < gridSize, blockSize, sizeof(float4)*numThreadsPerBlock 
+	Device::smComputeVelocities << < gridSize, blockSize, sizeof(float4)*numThreadsPerBlock 
 		>> > (Device::positions, Device::masses, Device::velocities, N);
 	//used only for error checking
 	//errorCheckCuda(cudaPeekAtLastError());
