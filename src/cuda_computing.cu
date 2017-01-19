@@ -3,6 +3,8 @@
 
 #include "cuda_computing.cuh"
 
+#define NUM_THREADS_PER_BLOCK 512
+
 namespace Device {
 	// CUDA global constants
 	__device__ __constant__
@@ -10,7 +12,7 @@ namespace Device {
 	__device__ __constant__
 		float DTGRAVITY;
 	__device__ __constant__
-		int BLOCKSIZE;
+		int NBODIES;
 
 	// array of masses
 	float *masses;
@@ -49,12 +51,12 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		computeVelocities(float3 *positions, float* masses, float3 *velocities, unsigned int N) {
+		computeVelocities(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-		if (tidx < N) {
+		if (tidx < NBODIES) {
 			float3 myPos = positions[tidx];
 			float3 myVelo = velocities[tidx];
-			for (unsigned int k = 0; k < N; ++k)
+			for (unsigned int k = 0; k < NBODIES; ++k)
 			{
 				myVelo = bodyBodyInteraction(myPos, positions[k], masses[k], myVelo);
 			}
@@ -98,7 +100,7 @@ namespace Device {
 	{
 		extern __shared__ float4 smPos[];
 
-		for (unsigned int i = 0; i < BLOCKSIZE; i++)
+		for (unsigned int i = 0; i < NUM_THREADS_PER_BLOCK; i++)
 		{
 			velo = smBodyBodyInteraction(myPos, smPos[i], velo);
 		}
@@ -112,16 +114,16 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		smComputeVelocities(float3 *positions, float* masses, float3 *velocities, unsigned int N) {
+		smComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 		extern __shared__ float4 smPos[];
 
-		if (tidx < N) {
+		if (tidx < NBODIES) {
 			float3 myPos = positions[tidx];
 			float3 myVelo = velocities[tidx];
 
-			for (int i = 0, tile = 0; i < N; i += BLOCKSIZE, tile++) {
-				int idx = tile * blockDim.x + threadIdx.x;
+			for (int i = 0, b_tile = 0; i < NBODIES; i += NUM_THREADS_PER_BLOCK, b_tile++) {
+				int idx = b_tile * blockDim.x + threadIdx.x;
 				smPos[threadIdx.x].x = positions[idx].x;
 				smPos[threadIdx.x].y = positions[idx].y;
 				smPos[threadIdx.x].z = positions[idx].z;
@@ -193,21 +195,21 @@ Cuda_Computing::initDevice() {
 
 	// determine thread layout
 	// num of threads on 1 block, thread layout per block
-	blockSize = dim3(256, 1, 1);
-	numThreadsPerBlock = blockSize.x*blockSize.y*blockSize.z;
-	int numBlocks = N / numThreadsPerBlock;
+	blockSize = dim3(NUM_THREADS_PER_BLOCK, 1, 1);
+	int numBlocks = N / NUM_THREADS_PER_BLOCK;
 	if (0 != N % blockSize.x) numBlocks++;
 	// number of blocks, block layout on grid
 	gridSize = dim3(numBlocks, 1, 1);
 
 	std::cerr << "num blocks = " << numBlocks << " :: "
-		<< "threads per Block = " << blockSize.x << std::endl;
+		<< "threads per Block = " << NUM_THREADS_PER_BLOCK << std::endl;
 
 	float dtG = G*DT;
+	int nTh = NUM_THREADS_PER_BLOCK;
 
 	errorCheckCuda(cudaMemcpyToSymbol(Device::EPSILON2, &EPS2, sizeof(float), 0, cudaMemcpyHostToDevice));
 	errorCheckCuda(cudaMemcpyToSymbol(Device::DTGRAVITY, &dtG, sizeof(float), 0, cudaMemcpyHostToDevice));
-	errorCheckCuda(cudaMemcpyToSymbol(Device::BLOCKSIZE, &numThreadsPerBlock, sizeof(float), 0, cudaMemcpyHostToDevice));
+	errorCheckCuda(cudaMemcpyToSymbol(Device::NBODIES, &N, sizeof(int), 0, cudaMemcpyHostToDevice));
 	return true;
 }
 
@@ -275,9 +277,9 @@ void
 Cuda_Computing::computeNewPositions() {
 	// run kernel computing velocities
 	//Device::computeVelocities << < gridSize, blockSize, 
-	//	>> > (Device::positions, Device::masses, Device::velocities, N);
-	Device::smComputeVelocities << < gridSize, blockSize, sizeof(float4)*numThreadsPerBlock 
-		>> > (Device::positions, Device::masses, Device::velocities, N);
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+	Device::smComputeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+		>> > (Device::positions, Device::masses, Device::velocities);
 	//used only for error checking
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());

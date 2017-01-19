@@ -4,7 +4,6 @@
 #define _USE_MATH_DEFINES
 #define CUDAPARALLEL
 
-
 #include <iostream>
 #include <string>
 #include <math.h>
@@ -337,7 +336,7 @@ starSystemFlat(std::vector<Body>& bodies)
 			++y;
 			x = 0;
 		}
-		glm::vec3 pos = glm::vec3(x * 30, y * 40, 0) + glm::vec3(400,400,0);
+		glm::vec3 pos = glm::vec3(x * 30, y * 100, 0) + glm::vec3(400,400,0);
 
 		Body curBody1(
 			2e16f,
