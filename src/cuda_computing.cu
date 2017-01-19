@@ -13,6 +13,8 @@ namespace Device {
 		float DTGRAVITY;
 	__device__ __constant__
 		int NBODIES;
+	__device__ __constant__
+		int NTHREADS;
 
 	// array of masses
 	float *masses;
@@ -25,6 +27,7 @@ namespace Device {
 	// physics calculations between bodies
 	// NOTES: try not using EPSILON for calculations
 	// NOTES: more than one particle in one thread
+	// NOTES: loop unrolling
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
 		float3
@@ -100,7 +103,7 @@ namespace Device {
 	{
 		extern __shared__ float4 smPos[];
 
-		for (unsigned int i = 0; i < NUM_THREADS_PER_BLOCK; i++)
+		for (unsigned int i = 0; i < NTHREADS; i++)
 		{
 			velo = smBodyBodyInteraction(myPos, smPos[i], velo);
 		}
@@ -122,7 +125,7 @@ namespace Device {
 			float3 myPos = positions[tidx];
 			float3 myVelo = velocities[tidx];
 
-			for (int i = 0, b_tile = 0; i < NBODIES; i += NUM_THREADS_PER_BLOCK, b_tile++) {
+			for (int i = 0, b_tile = 0; i < NBODIES; i += NTHREADS, b_tile++) {
 				int idx = b_tile * blockDim.x + threadIdx.x;
 				smPos[threadIdx.x].x = positions[idx].x;
 				smPos[threadIdx.x].y = positions[idx].y;
@@ -210,6 +213,7 @@ Cuda_Computing::initDevice() {
 	errorCheckCuda(cudaMemcpyToSymbol(Device::EPSILON2, &EPS2, sizeof(float), 0, cudaMemcpyHostToDevice));
 	errorCheckCuda(cudaMemcpyToSymbol(Device::DTGRAVITY, &dtG, sizeof(float), 0, cudaMemcpyHostToDevice));
 	errorCheckCuda(cudaMemcpyToSymbol(Device::NBODIES, &N, sizeof(int), 0, cudaMemcpyHostToDevice));
+	errorCheckCuda(cudaMemcpyToSymbol(Device::NTHREADS, &blockSize.x, sizeof(int), 0, cudaMemcpyHostToDevice));
 	return true;
 }
 
