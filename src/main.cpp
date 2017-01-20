@@ -51,6 +51,7 @@ main()
 	float avgFPS = 0;
 	int frameRuns = 0;
 	float curFPS = 0;
+	float kernelTime = 0;
 	bool isComputing = true;
 	// clock for time keeping
 	sf::Clock elapsedTime;
@@ -138,7 +139,7 @@ main()
 
 		if (isComputing) {
 			/// nbody calculations
-			cuda_computer.computeNewPositions();
+			kernelTime += cuda_computer.computeNewPositions();
 		}
 
 		// time measurement
@@ -154,6 +155,7 @@ main()
 	}
 
 	std::cerr << "Average FPS: " << avgFPS << "  ::  gFLOPs: " << avgFPS * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
+	std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs cuda: " << 1000/(kernelTime/frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
 	return 0;
 }
 

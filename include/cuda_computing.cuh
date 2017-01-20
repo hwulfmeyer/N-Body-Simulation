@@ -8,12 +8,16 @@
 #include <iostream>
 #include <algorithm>
 
+
 #include "glew.h"
 #include "device_launch_parameters.h"
 #include "vector_types.h"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "cuda_gl_interop.h"
+#define __CUDA_INTERNAL_COMPILATION__
+#include "math_functions.h"
+#undef __CUDA_INTERNAL_COMPILATION__
 
 
 #include "body.h"
@@ -41,7 +45,7 @@ public:
 
 	bool initVertexBuffer();
 
-	void computeNewPositions();
+	float computeNewPositions();
 
 	size_t getSize() const;
 

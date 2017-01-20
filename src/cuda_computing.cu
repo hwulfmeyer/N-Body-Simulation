@@ -67,7 +67,7 @@ namespace Device {
 			myPos.x += myVelo.x * DTGRAVITY;
 			myPos.y += myVelo.y * DTGRAVITY;
 			myPos.z += myVelo.z * DTGRAVITY;
-	
+
 			positions[tidx] = myPos;
 			velocities[tidx] = myVelo;
 		}
@@ -88,26 +88,12 @@ namespace Device {
 		// 6 FLOP
 		float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPSILON2;
 		// 4 FLOP
-		float partForce = othPos.w / sqrtf(distSqr*distSqr*distSqr);
+		float partForce = rsqrtf(distSqr*distSqr*distSqr);
+		partForce *= othPos.w;
 		// 6 FLOP
 		velo.x += dir.x * partForce;
 		velo.y += dir.y * partForce;
 		velo.z += dir.z * partForce;
-		return velo;
-	}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// physics calculations between bodies in a tile [SHARED MEMORY]
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	__device__ float3 smTileCalculation(float3 myPos, float3 velo)
-	{
-		extern __shared__ float4 smPos[];
-
-		for (unsigned int i = 0; i < NTHREADS; i++)
-		{
-			velo = smBodyBodyInteraction(myPos, smPos[i], velo);
-		}
-
 		return velo;
 	}
 
@@ -124,21 +110,28 @@ namespace Device {
 		if (tidx < NBODIES) {
 			float3 myPos = positions[tidx];
 			float3 myVelo = velocities[tidx];
-
-			for (int i = 0, b_tile = 0; i < NBODIES; i += NTHREADS, b_tile++) {
+			// we do this NBODIES/NTHREADS times, the number of total blocks in our kernel
+			for (int i = 0, b_tile = 0; i < NBODIES; i += NUM_THREADS_PER_BLOCK, b_tile++) {
 				int idx = b_tile * blockDim.x + threadIdx.x;
 				smPos[threadIdx.x].x = positions[idx].x;
 				smPos[threadIdx.x].y = positions[idx].y;
 				smPos[threadIdx.x].z = positions[idx].z;
 				smPos[threadIdx.x].w = masses[idx];
 				__syncthreads();
-				myVelo = smTileCalculation(myPos, myVelo);
+				//compute interactions in our current sharedMemory
+
+				for (unsigned int i = 0; i < NUM_THREADS_PER_BLOCK; i++)
+				{
+					myVelo = smBodyBodyInteraction(myPos, smPos[i], myVelo);
+				}
 				__syncthreads();
 			}
+			
 			myPos.x += myVelo.x * DTGRAVITY;
 			myPos.y += myVelo.y * DTGRAVITY;
 			myPos.z += myVelo.z * DTGRAVITY;
 
+			__syncthreads();
 			positions[tidx] = myPos;
 			velocities[tidx] = myVelo;
 		}
@@ -277,16 +270,24 @@ Cuda_Computing::initVertexBuffer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // kernel entry point
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void
+float
 Cuda_Computing::computeNewPositions() {
-	// run kernel computing velocities
-	//Device::computeVelocities << < gridSize, blockSize, 
-	//	>> > (Device::positions, Device::masses, Device::velocities);
+	float time;
+	cudaEvent_t start, stop;
+	errorCheckCuda(cudaEventCreate(&start));
+	errorCheckCuda(cudaEventCreate(&stop));
+	errorCheckCuda(cudaEventRecord(start, 0));
+
 	Device::smComputeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
 		>> > (Device::positions, Device::masses, Device::velocities);
-	//used only for error checking
+
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
+	errorCheckCuda(cudaEventRecord(stop, 0));
+	errorCheckCuda(cudaEventSynchronize(stop));
+	errorCheckCuda(cudaEventElapsedTime(&time, start, stop));
+
+	return time;
 }
 
 
