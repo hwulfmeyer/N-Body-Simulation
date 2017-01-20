@@ -331,7 +331,7 @@ starSystem4(std::vector<Body>& bodies)
 void 
 starSystemFlat(std::vector<Body>& bodies)
 {
-	unsigned const int numParticles = 16384*4; //131072;
+	unsigned const int numParticles = 16384; //131072;
 	// fill vector body with bodies
 	for (int i=0,x=0,y=0; i < numParticles; ++i, ++x) {
 		if (x > 768) {
@@ -341,7 +341,7 @@ starSystemFlat(std::vector<Body>& bodies)
 		glm::vec3 pos = glm::vec3(x * 30, y * 100, 0) + glm::vec3(400,400,0);
 
 		Body curBody1(
-			2e16f,
+			2e17f,
 			pos,
 			glm::vec3(0, 0, 0)
 		);

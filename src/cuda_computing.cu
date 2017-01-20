@@ -3,7 +3,7 @@
 
 #include "cuda_computing.cuh"
 
-#define NUM_THREADS_PER_BLOCK 512
+#define NUM_THREADS_PER_BLOCK 128
 
 namespace Device {
 	// CUDA global constants
@@ -27,7 +27,6 @@ namespace Device {
 	// physics calculations between bodies
 	// NOTES: try not using EPSILON for calculations
 	// NOTES: more than one particle in one thread
-	// NOTES: loop unrolling
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
 		float3
@@ -73,6 +72,57 @@ namespace Device {
 		}
 	}
 
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel using shared Memory + doing 2 body calculations at once
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		twoComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
+		unsigned int tidA = blockIdx.x * blockDim.x*2 + threadIdx.x*2;
+		unsigned int tidB = tidA + 1;
+
+		if (tidA < NBODIES) {
+			if (tidB < NBODIES) {
+				float3 myPosA = positions[tidA];
+				float3 myPosB = positions[tidB];
+				float3 myVeloA = velocities[tidA];
+				float3 myVeloB = velocities[tidB];
+				for (unsigned int k = 0; k < NBODIES; ++k)
+				{
+					float3 curPos = positions[k];
+					float curMass = masses[k];
+					myVeloA = bodyBodyInteraction(myPosA, curPos, curMass, myVeloA);
+					myVeloB = bodyBodyInteraction(myPosB, curPos, curMass, myVeloB);
+				}
+				myPosA.x += myVeloA.x * DTGRAVITY;
+				myPosA.y += myVeloA.y * DTGRAVITY;
+				myPosA.z += myVeloA.z * DTGRAVITY;
+				myPosB.x += myVeloB.x * DTGRAVITY;
+				myPosB.y += myVeloB.y * DTGRAVITY;
+				myPosB.z += myVeloB.z * DTGRAVITY;
+
+				positions[tidA] = myPosA;
+				positions[tidB] = myPosB;
+				velocities[tidA] = myVeloA;
+				velocities[tidB] = myVeloB;
+			}
+			else {
+				float3 myPos = positions[tidA];
+				float3 myVelo = velocities[tidA];
+				for (unsigned int k = 0; k < NBODIES; ++k)
+				{
+					myVelo = bodyBodyInteraction(myPos, positions[k], masses[k], myVelo);
+				}
+				myPos.x += myVelo.x * DTGRAVITY;
+				myPos.y += myVelo.y * DTGRAVITY;
+				myPos.z += myVelo.z * DTGRAVITY;
+
+				positions[tidA] = myPos;
+				velocities[tidA] = myVelo;
+			}
+		}
+	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// physics calculations between bodies [SHARED MEMORY]
@@ -126,7 +176,7 @@ namespace Device {
 				}
 				__syncthreads();
 			}
-			
+
 			myPos.x += myVelo.x * DTGRAVITY;
 			myPos.y += myVelo.y * DTGRAVITY;
 			myPos.z += myVelo.z * DTGRAVITY;
@@ -197,8 +247,16 @@ Cuda_Computing::initDevice() {
 	// number of blocks, block layout on grid
 	gridSize = dim3(numBlocks, 1, 1);
 
-	std::cerr << "num blocks = " << numBlocks << " :: "
-		<< "threads per Block = " << NUM_THREADS_PER_BLOCK << std::endl;
+	//determine thread layout when doing 2 body calculations per thread
+	int numBlocksHalf = N / (NUM_THREADS_PER_BLOCK*2);
+	if (0 != N % (blockSize.x*2)) numBlocksHalf++;
+	// number of blocks, block layout on grid
+	gridSizeHalf = dim3(numBlocksHalf, 1, 1);
+
+
+	std::cerr << "num blocks = " << numBlocks << " :: " 
+		<< "threads per Block = " << NUM_THREADS_PER_BLOCK << " :: " 
+		<< "num blocks half = " << numBlocksHalf << std::endl;
 
 	float dtG = G*DT;
 	int nTh = NUM_THREADS_PER_BLOCK;
@@ -278,7 +336,10 @@ Cuda_Computing::computeNewPositions() {
 	errorCheckCuda(cudaEventCreate(&stop));
 	errorCheckCuda(cudaEventRecord(start, 0));
 
-	Device::smComputeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	//Device::twoComputeVelocities << < gridSizeHalf, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+
+	Device::computeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
 		>> > (Device::positions, Device::masses, Device::velocities);
 
 	//errorCheckCuda(cudaPeekAtLastError());
