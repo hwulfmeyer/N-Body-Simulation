@@ -78,7 +78,7 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		twoComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
+		taoComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidA = blockIdx.x * blockDim.x*2 + threadIdx.x*2;
 		unsigned int tidB = tidA + 1;
 
@@ -336,11 +336,12 @@ Cuda_Computing::computeNewPositions() {
 	errorCheckCuda(cudaEventCreate(&stop));
 	errorCheckCuda(cudaEventRecord(start, 0));
 
-	//Device::twoComputeVelocities << < gridSizeHalf, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	//Device::computeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
 	//	>> > (Device::positions, Device::masses, Device::velocities);
 
-	Device::computeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	Device::taoComputeVelocities << < gridSizeHalf, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
 		>> > (Device::positions, Device::masses, Device::velocities);
+
 
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
