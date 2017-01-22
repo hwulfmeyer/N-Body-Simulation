@@ -4,6 +4,7 @@
 #include "cuda_computing.cuh"
 
 #define NUM_THREADS_PER_BLOCK 128
+#define NUM_BODIES_PER_THREAD 4
 
 namespace Device {
 	// CUDA global constants
@@ -49,7 +50,7 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel computing velocities
+	// naive kernel computing velocities
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
@@ -62,7 +63,7 @@ namespace Device {
 			{
 				myVelo = bodyBodyInteraction(myPos, positions[k], masses[k], myVelo);
 			}
-			
+
 			myPos.x += myVelo.x * DTGRAVITY;
 			myPos.y += myVelo.y * DTGRAVITY;
 			myPos.z += myVelo.z * DTGRAVITY;
@@ -74,12 +75,12 @@ namespace Device {
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel using shared Memory + doing 2 body calculations at once
+	// naive kernel computing velocities + doing two body calculations at once
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
 		taoComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
-		unsigned int tidA = blockIdx.x * blockDim.x*2 + threadIdx.x*2;
+		unsigned int tidA = blockIdx.x * blockDim.x * 2 + threadIdx.x * 2;
 		unsigned int tidB = tidA + 1;
 
 		if (tidA < NBODIES) {
@@ -125,11 +126,143 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// physics calculations between bodies [SHARED MEMORY]
+	// naive kernel computing velocities + doing NUM_BODIES_PER_THREAD body calculations at once
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		xaoComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
+		unsigned int tids[NUM_BODIES_PER_THREAD];
+		tids[0] = blockIdx.x * blockDim.x * NUM_BODIES_PER_THREAD + threadIdx.x * NUM_BODIES_PER_THREAD;
+
+		if (tids[0] < NBODIES) {
+			unsigned int i_max = 0;
+			for (unsigned int i = 1; i < NUM_BODIES_PER_THREAD && tids[i_max] < NBODIES; ++i, ++i_max) {
+				tids[i] = tids[i - 1] + 1;
+			}
+			float3 myPos[NUM_BODIES_PER_THREAD];
+			float3 myVelo[NUM_BODIES_PER_THREAD];
+
+			//in our tids array no tids are out of bounds
+			if (i_max + 1 == NUM_BODIES_PER_THREAD) {
+
+				for (int i = 0; i < NUM_BODIES_PER_THREAD; ++i) {
+					myPos[i] = positions[tids[i]];
+					myVelo[i] = velocities[tids[i]];
+				}
+
+				for (unsigned int k = 0; k < NBODIES; ++k)
+				{
+					for (int i = 0; i < NUM_BODIES_PER_THREAD; ++i) {
+						myVelo[i] = bodyBodyInteraction(myPos[i], positions[k], masses[k], myVelo[i]);
+					}
+				}
+
+				for (int i = 0; i < NUM_BODIES_PER_THREAD; ++i) {
+					myPos[i].x += myVelo[i].x * DTGRAVITY;
+					myPos[i].y += myVelo[i].y * DTGRAVITY;
+					myPos[i].z += myVelo[i].z * DTGRAVITY;
+
+					positions[tids[i]] = myPos[i];
+					velocities[tids[i]] = myVelo[i];
+				}
+			}
+			// we have got tids that are out of bounds, take i_max+1 instead as max value
+			else {
+
+				for (int i = 0; i < i_max; ++i) {
+					myPos[i] = positions[tids[i]];
+					myVelo[i] = velocities[tids[i]];
+				}
+
+				for (unsigned int k = 0; k < NBODIES; ++k)
+				{
+					for (int i = 0; i < i_max; ++i) {
+						myVelo[i] = bodyBodyInteraction(myPos[i], positions[k], masses[k], myVelo[i]);
+					}
+				}
+
+				for (int i = 0; i < i_max; ++i) {
+					myPos[i].x += myVelo[i].x * DTGRAVITY;
+					myPos[i].y += myVelo[i].y * DTGRAVITY;
+					myPos[i].z += myVelo[i].z * DTGRAVITY;
+
+					positions[tids[i]] = myPos[i];
+					velocities[tids[i]] = myVelo[i];
+				}
+			}
+		}
+	}
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// physics calculations between bodies [v1.SHARED MEMORY]
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
 		float3
-		smBodyBodyInteraction(float3 myPos, float4 othPos, float3 velo) {
+		smV1BodyBodyInteraction(float3 myPos, float4 othPos, float3 velo) {
+		float3 dir;
+		//3 FLOP
+		dir.x = othPos.x - myPos.x;
+		dir.y = othPos.y - myPos.y;
+		dir.z = othPos.z - myPos.z;
+		// 6 FLOP
+		float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPSILON2;
+		// 4 FLOP
+		float partForce = othPos.w / sqrtf(distSqr*distSqr*distSqr);
+		// 6 FLOP
+		velo.x += dir.x * partForce;
+		velo.y += dir.y * partForce;
+		velo.z += dir.z * partForce;
+		return velo;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel v.SHARED
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		smV1ComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
+		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
+		extern __shared__ float4 smPos[];
+
+		if (tidx < NBODIES) {
+			float3 myPos = positions[tidx];
+			float3 myVelo = velocities[tidx];
+			// each loop step copies NUM_THREADS_PER_BLOCK values into shared memory
+			// hence we have to do it gridDim.x = NBODIES/NUM_THREADS_PER_BLOCK times to get to each body
+			for (int curTileIdx = 0; curTileIdx < gridDim.x; curTileIdx++) {
+				int idx = curTileIdx * blockDim.x + threadIdx.x;
+				smPos[threadIdx.x].x = positions[idx].x;
+				smPos[threadIdx.x].y = positions[idx].y;
+				smPos[threadIdx.x].z = positions[idx].z;
+				smPos[threadIdx.x].w = masses[idx];
+				__syncthreads();
+				//compute interactions in our current sharedMemory
+
+				for (unsigned int i = 0; i < NTHREADS; i++)
+				{
+					myVelo = smV1BodyBodyInteraction(myPos, smPos[i], myVelo);
+				}
+				__syncthreads();
+			}
+
+			myPos.x += myVelo.x * DTGRAVITY;
+			myPos.y += myVelo.y * DTGRAVITY;
+			myPos.z += myVelo.z * DTGRAVITY;
+
+			__syncthreads();
+			positions[tidx] = myPos;
+			velocities[tidx] = myVelo;
+		}
+	}
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// physics calculations between bodies [v2.SHARED MEMORY]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__device__
+		float3
+		smV2BodyBodyInteraction(float3 myPos, float4 othPos, float3 velo) {
 		float3 dir;
 		//3 FLOP
 		dir.x = othPos.x - myPos.x;
@@ -148,21 +281,21 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel using shared Memory computing velocities
-	// NVS4200M has 48KB of SM per SMP meaning 1 block on one SMP uses that much, 2 blocks split the 48KB...
+	// kernel v.SHARED + LOOP UNROLL + rsqrtf()
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
-		smComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
+		smV3ComputeVelocities(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 		extern __shared__ float4 smPos[];
 
 		if (tidx < NBODIES) {
 			float3 myPos = positions[tidx];
 			float3 myVelo = velocities[tidx];
-			// we do this NBODIES/NTHREADS times, the number of total blocks in our kernel
-			for (int i = 0, b_tile = 0; i < NBODIES; i += NUM_THREADS_PER_BLOCK, b_tile++) {
-				int idx = b_tile * blockDim.x + threadIdx.x;
+			// each loop step copies NUM_THREADS_PER_BLOCK values into shared memory
+			// hence we have to do it gridDim.x = NBODIES/NUM_THREADS_PER_BLOCK times to get to each body
+			for (int curTileIdx = 0; curTileIdx < gridDim.x; curTileIdx++) {
+				int idx = curTileIdx * blockDim.x + threadIdx.x;
 				smPos[threadIdx.x].x = positions[idx].x;
 				smPos[threadIdx.x].y = positions[idx].y;
 				smPos[threadIdx.x].z = positions[idx].z;
@@ -248,15 +381,21 @@ Cuda_Computing::initDevice() {
 	gridSize = dim3(numBlocks, 1, 1);
 
 	//determine thread layout when doing 2 body calculations per thread
-	int numBlocksHalf = N / (NUM_THREADS_PER_BLOCK*2);
-	if (0 != N % (blockSize.x*2)) numBlocksHalf++;
+	int numBlocksTAO = N / (NUM_THREADS_PER_BLOCK * 2);
+	if (0 != N % (blockSize.x * 2)) numBlocksTAO++;
 	// number of blocks, block layout on grid
-	gridSizeHalf = dim3(numBlocksHalf, 1, 1);
+	gridSizeTAO = dim3(numBlocksTAO, 1, 1);
 
+	//determine thread layout when doing NUM_BODIES_PER_THREAD body calculations per thread
+	int numBlocksXAO = N / (NUM_THREADS_PER_BLOCK * NUM_BODIES_PER_THREAD);
+	if (0 != N % (blockSize.x * NUM_BODIES_PER_THREAD)) numBlocksXAO++;
+	// number of blocks, block layout on grid
+	gridSizeXAO = dim3(numBlocksXAO, 1, 1);
 
-	std::cerr << "num blocks = " << numBlocks << " :: " 
-		<< "threads per Block = " << NUM_THREADS_PER_BLOCK << " :: " 
-		<< "num blocks half = " << numBlocksHalf << std::endl;
+	std::cerr << "num blocks = " << gridSize.x << " :: "
+		<< "threads per Block = " << blockSize.x << " :: "
+		<< "num blocks tao = " << gridSizeTAO.x << " :: "
+		<< "num blocks xao = " << gridSizeXAO.x << std::endl;
 
 	float dtG = G*DT;
 	int nTh = NUM_THREADS_PER_BLOCK;
@@ -336,12 +475,17 @@ Cuda_Computing::computeNewPositions() {
 	errorCheckCuda(cudaEventCreate(&stop));
 	errorCheckCuda(cudaEventRecord(start, 0));
 
-	//Device::computeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	//Device::computeVelocities << < gridSize, blockSize
 	//	>> > (Device::positions, Device::masses, Device::velocities);
 
-	Device::taoComputeVelocities << < gridSizeHalf, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	Device::smV3ComputeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
 		>> > (Device::positions, Device::masses, Device::velocities);
 
+	//Device::taoComputeVelocities << < gridSizeTAO, blockSize
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+
+	//Device::xaoComputeVelocities << < gridSizeXAO, blockSize
+	//	>> > (Device::positions, Device::masses, Device::velocities);
 
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
