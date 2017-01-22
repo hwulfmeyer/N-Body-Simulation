@@ -4,7 +4,7 @@
 #include "cuda_computing.cuh"
 
 #define NUM_THREADS_PER_BLOCK 128
-#define NUM_BODIES_PER_THREAD 4
+#define NUM_BODIES_PER_THREAD 2
 
 namespace Device {
 	// CUDA global constants
@@ -27,7 +27,6 @@ namespace Device {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// physics calculations between bodies
 	// NOTES: try not using EPSILON for calculations
-	// NOTES: more than one particle in one thread
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__device__
 		float3
@@ -127,6 +126,7 @@ namespace Device {
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// naive kernel computing velocities + doing NUM_BODIES_PER_THREAD body calculations at once
+	// if NBODIES % (32*NUM_BODIES_PER_THREAD) =!= 0 is true we get branch divergence
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
@@ -305,7 +305,7 @@ namespace Device {
 
 				for (unsigned int i = 0; i < NUM_THREADS_PER_BLOCK; i++)
 				{
-					myVelo = smBodyBodyInteraction(myPos, smPos[i], myVelo);
+					myVelo = smV2BodyBodyInteraction(myPos, smPos[i], myVelo);
 				}
 				__syncthreads();
 			}
@@ -478,14 +478,14 @@ Cuda_Computing::computeNewPositions() {
 	//Device::computeVelocities << < gridSize, blockSize
 	//	>> > (Device::positions, Device::masses, Device::velocities);
 
-	Device::smV3ComputeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
-		>> > (Device::positions, Device::masses, Device::velocities);
+	//Device::smV3ComputeVelocities << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
+	//	>> > (Device::positions, Device::masses, Device::velocities);
 
 	//Device::taoComputeVelocities << < gridSizeTAO, blockSize
 	//	>> > (Device::positions, Device::masses, Device::velocities);
 
-	//Device::xaoComputeVelocities << < gridSizeXAO, blockSize
-	//	>> > (Device::positions, Device::masses, Device::velocities);
+	Device::xaoComputeVelocities << < gridSizeXAO, blockSize
+		>> > (Device::positions, Device::masses, Device::velocities);
 
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
