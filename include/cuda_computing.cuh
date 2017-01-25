@@ -8,7 +8,6 @@
 #include <iostream>
 #include <algorithm>
 
-
 #include "glew.h"
 #include "device_launch_parameters.h"
 #include "vector_types.h"

@@ -2,6 +2,7 @@
 
 #include "cpu_computing.h"
 
+typedef std::chrono::time_point<std::chrono::high_resolution_clock> tpoint;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // constructor, copies all the stuff to this class
@@ -58,9 +59,10 @@ Cpu_Computing::setThreads(unsigned int nthreads) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // spawns threads and waits for all of them to finish
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void 
+float
 Cpu_Computing::compute_forces(float dt) {
 
+	tpoint t_start = std::chrono::high_resolution_clock::now();
 	// spawn threads
 	float dtG = dt * G;
 	std::vector<std::thread> threads;
@@ -77,6 +79,9 @@ Cpu_Computing::compute_forces(float dt) {
 	for (unsigned int i = 0; i < threads.size(); ++i) {
 		threads[i].join();
 	}
+	tpoint t_end = std::chrono::high_resolution_clock::now();
+
+	return std::chrono::duration<float, std::milli>(t_end - t_start).count();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -78,10 +78,18 @@ main()
 	//setup cuda etc.
 	std::vector<Body> bodies;
 	starSystemFlat(bodies); /// system
+#ifdef CUDAPARALLEL
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
 	cuda_computer.initVertexBuffer();
 	const size_t sizeBodies = cuda_computer.getSize();
+#else
+	Cpu_Computing cpu_computer(bodies);
+	cpu_computer.setThreads();
+
+	const float *positions = cpu_computer.getPositions();
+	const size_t sizeBodies = cpu_computer.getSize();
+#endif
 
 	elapsedTime.restart();
 	// window loop
@@ -126,7 +134,12 @@ main()
 
 		glEnableClientState(GL_VERTEX_ARRAY);
 
-		glVertexPointer(3, GL_FLOAT, sizeof(float3), 0);
+#ifdef CUDAPARALLEL
+		glVertexPointer(3, GL_FLOAT, sizeof(float3),0);
+#else
+		glVertexPointer(3, GL_FLOAT, 0, positions);
+#endif
+
 		glDrawArrays(GL_POINTS, 0, sizeBodies);
 
 		glDisableClientState(GL_VERTEX_ARRAY);
@@ -139,7 +152,11 @@ main()
 
 		if (isComputing) {
 			/// nbody calculations
+#ifdef CUDAPARALLEL
 			kernelTime += cuda_computer.computeNewPositions();
+#else
+			kernelTime += cpu_computer.compute_forces(DT);
+#endif
 		}
 
 		// time measurement
@@ -154,8 +171,8 @@ main()
 		}
 	}
 
-	std::cerr << "Average FPS: " << avgFPS << "  ::  gFLOPs: " << avgFPS * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
-	std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs cuda: " << 1000/(kernelTime/frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
+	std::cerr << "Average FPS: " << avgFPS << "  ::  gFLOPs from fps: " << avgFPS * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
+	std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs from time: " << 1000/(kernelTime/frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
 	return 0;
 }
 
@@ -331,7 +348,7 @@ starSystem4(std::vector<Body>& bodies)
 void 
 starSystemFlat(std::vector<Body>& bodies)
 {
-	unsigned const int numParticles = 300; //131072;
+	unsigned const int numParticles = 65536; //131072;
 	// fill vector body with bodies
 	for (int i=0,x=0,y=0; i < numParticles; ++i, ++x) {
 		if (x > 768) {

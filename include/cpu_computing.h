@@ -7,6 +7,8 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <chrono>
+
 #include <glm/gtc/type_ptr.hpp>
 #include "body.h"
 
@@ -26,7 +28,7 @@ public:
 
 	void setThreads(unsigned int nthreads);
 
-	void compute_forces(float dt);
+	float compute_forces(float dt);
 
 	void computeTile(const int tid, const int &num_threads, float dtG);
 
