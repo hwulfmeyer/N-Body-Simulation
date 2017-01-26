@@ -4,7 +4,8 @@
 #include "cuda_computing.cuh"
 
 #define THREADS_PER_BLOCK 128
-#define BODIES_PER_THREAD 8 //only mutiples of 2
+#define BODIES_PER_THREAD 4 //only mutiples of 2
+#define EB_SHAREDMEMORY
 
 namespace Device {
 	// CUDA global constants
@@ -292,7 +293,7 @@ namespace Device {
 			myPos[i].y += myVelo[i].y * DTGRAVITY;
 			myPos[i].z += myVelo[i].z * DTGRAVITY;
 		}
-
+		__syncthreads();
 #pragma unroll BODIES_PER_THREAD
 		for (int i = 0; i < BODIES_PER_THREAD; ++i) {
 			positions[tids[i]] = myPos[i];
@@ -319,7 +320,7 @@ namespace Device {
 		float3 myVeloA = velocities[tidA];
 		float3 myVeloB = velocities[tidB];
 
-		for (int curTileIdx = 0; curTileIdx < gridDim.x*2; ++curTileIdx) {
+		for (int curTileIdx = 0; curTileIdx < gridDim.x * 2; ++curTileIdx) {
 			int idx = curTileIdx * blockDim.x + threadIdx.x;
 			smPos[threadIdx.x].x = positions[idx].x;
 			smPos[threadIdx.x].y = positions[idx].y;
@@ -349,6 +350,76 @@ namespace Device {
 		positions[tidB] = myPosB;
 		velocities[tidA] = myVeloA;
 		velocities[tidB] = myVeloB;
+	}
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel [v4_1.SHARED + LOOP UNROLL + rsqrtf() + X AT ONCE]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		smComputeVelocitiesV3xao(float3 *positions, float* masses, float3 *velocities) {
+		unsigned int tids[BODIES_PER_THREAD];
+		__shared__ float4 smPos[THREADS_PER_BLOCK];
+
+		tids[0] = blockIdx.x * blockDim.x * BODIES_PER_THREAD + threadIdx.x * BODIES_PER_THREAD;
+
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 1; i < BODIES_PER_THREAD; ++i) {
+			tids[i] = tids[i - 1] + 1;
+		}
+
+		float3 myPos[BODIES_PER_THREAD];
+		float3 myVelo[BODIES_PER_THREAD];
+
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 0; i < BODIES_PER_THREAD; ++i) {
+			myPos[i] = positions[tids[i]];
+		}
+
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 0; i < BODIES_PER_THREAD; ++i) {
+			myVelo[i] = velocities[tids[i]];
+		}
+
+		for (unsigned int curTileIdx = 0; curTileIdx < gridDim.x * BODIES_PER_THREAD; ++curTileIdx) {
+			int idx = curTileIdx * blockDim.x + threadIdx.x;
+			smPos[threadIdx.x].x = positions[idx].x;
+			smPos[threadIdx.x].y = positions[idx].y;
+			smPos[threadIdx.x].z = positions[idx].z;
+			smPos[threadIdx.x].w = masses[idx];
+
+			__syncthreads();
+			//compute interactions in our current sharedMemory
+
+#pragma unroll THREADS_PER_BLOCK
+			for (unsigned int i = 0; i < THREADS_PER_BLOCK; i++)
+			{
+#pragma unroll BODIES_PER_THREAD
+				for (unsigned int k = 0; k < BODIES_PER_THREAD; ++k) {
+					myVelo[k] = smBodyBodyInteractionV2(myPos[k], smPos[i], myVelo[k]);
+				}
+			}
+			__syncthreads();
+		}
+
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 0; i < BODIES_PER_THREAD; ++i) {
+			myPos[i].x += myVelo[i].x * DTGRAVITY;
+			myPos[i].y += myVelo[i].y * DTGRAVITY;
+			myPos[i].z += myVelo[i].z * DTGRAVITY;
+		}
+
+		__syncthreads();
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 0; i < BODIES_PER_THREAD; ++i) {
+			positions[tids[i]] = myPos[i];
+		}
+		__syncthreads();
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 0; i < BODIES_PER_THREAD; ++i) {
+			velocities[tids[i]] = myVelo[i];
+		}
 	}
 
 }
@@ -523,7 +594,10 @@ Cuda_Computing::computeNewPositions() {
 	//Device::smComputeVelocitiesV3 << < gridSize, blockSize
 	//	>> > (Device::positions, Device::masses, Device::velocities);
 
-	Device::smComputeVelocitiesV3tao << < gridSizeTAO, blockSize
+	//Device::smComputeVelocitiesV3tao << < gridSizeTAO, blockSize
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+
+	Device::smComputeVelocitiesV3xao << < gridSizeXAO, blockSize
 		>> > (Device::positions, Device::masses, Device::velocities);
 
 	//errorCheckCuda(cudaPeekAtLastError());
