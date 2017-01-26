@@ -3,8 +3,8 @@
 
 #include "cuda_computing.cuh"
 
-#define NUM_THREADS_PER_BLOCK 128
-#define NUM_BODIES_PER_THREAD 4 //only mutiples of 2
+#define THREADS_PER_BLOCK 128
+#define BODIES_PER_THREAD 8 //only mutiples of 2
 
 namespace Device {
 	// CUDA global constants
@@ -94,7 +94,30 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// naive kernel computing velocities
+	// physics calculations between bodies [v.SHARED MEMORY + RSQRTF() + float4pad usage]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__device__
+		float3
+		smBodyBodyInteractionV2pad(float3 myPos, float3 othPos, float othMass, float3 velo) {
+		float3 dir;
+		//3 FLOP
+		dir.x = othPos.x - myPos.x;
+		dir.y = othPos.y - myPos.y;
+		dir.z = othPos.z - myPos.z;
+		// 6 FLOP
+		float distSqr = dir.x*dir.x + dir.y*dir.y + dir.z*dir.z + EPSILON2;
+		// 4 FLOP
+		float partForce = rsqrtf(distSqr*distSqr*distSqr);
+		partForce *= othMass;
+		// 6 FLOP
+		velo.x += dir.x * partForce;
+		velo.y += dir.y * partForce;
+		velo.z += dir.z * partForce;
+		return velo;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// naive kernel computing velocities [v1.NAIVE]
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
@@ -117,86 +140,15 @@ namespace Device {
 		velocities[tidx] = myVelo;
 	}
 
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// naive kernel computing velocities + doing two body calculations at once
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	__global__
-		void
-		ComputeVelocitiesTao(float3 *positions, float* masses, float3 *velocities) {
-		unsigned int tidA = blockIdx.x * blockDim.x * 2 + threadIdx.x * 2;
-		unsigned int tidB = tidA + 1;
-
-		float3 myPosA = positions[tidA];
-		float3 myPosB = positions[tidB];
-		float3 myVeloA = velocities[tidA];
-		float3 myVeloB = velocities[tidB];
-		for (unsigned int k = 0; k < NBODIES; ++k)
-		{
-			float3 curPos = positions[k];
-			float curMass = masses[k];
-			myVeloA = bodyBodyInteraction(myPosA, curPos, curMass, myVeloA);
-			myVeloB = bodyBodyInteraction(myPosB, curPos, curMass, myVeloB);
-		}
-		myPosA.x += myVeloA.x * DTGRAVITY;
-		myPosA.y += myVeloA.y * DTGRAVITY;
-		myPosA.z += myVeloA.z * DTGRAVITY;
-		myPosB.x += myVeloB.x * DTGRAVITY;
-		myPosB.y += myVeloB.y * DTGRAVITY;
-		myPosB.z += myVeloB.z * DTGRAVITY;
-
-		positions[tidA] = myPosA;
-		positions[tidB] = myPosB;
-		velocities[tidA] = myVeloA;
-		velocities[tidB] = myVeloB;
-	}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// naive kernel computing velocities + doing NUM_BODIES_PER_THREAD body calculations at once
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	__global__
-		void
-		ComputeVelocitiesXao(float3 *positions, float* masses, float3 *velocities) {
-		unsigned int tids[NUM_BODIES_PER_THREAD];
-
-		tids[0] = blockIdx.x * blockDim.x * NUM_BODIES_PER_THREAD + threadIdx.x * NUM_BODIES_PER_THREAD;
-		for (unsigned int i = 1; i < NUM_BODIES_PER_THREAD; ++i) {
-			tids[i] = tids[i - 1] + 1;
-		}
-
-		float3 myPos[NUM_BODIES_PER_THREAD];
-		float3 myVelo[NUM_BODIES_PER_THREAD];
-		for (int i = 0; i < NUM_BODIES_PER_THREAD; ++i) {
-			myPos[i] = positions[tids[i]];
-			myVelo[i] = velocities[tids[i]];
-		}
-
-		for (unsigned int k = 0; k < NBODIES; ++k)
-		{
-			for (int i = 0; i < NUM_BODIES_PER_THREAD; ++i) {
-				myVelo[i] = bodyBodyInteraction(myPos[i], positions[k], masses[k], myVelo[i]);
-			}
-		}
-
-		for (int i = 0; i < NUM_BODIES_PER_THREAD; ++i) {
-			myPos[i].x += myVelo[i].x * DTGRAVITY;
-			myPos[i].y += myVelo[i].y * DTGRAVITY;
-			myPos[i].z += myVelo[i].z * DTGRAVITY;
-
-			positions[tids[i]] = myPos[i];
-			velocities[tids[i]] = myVelo[i];
-		}
-	}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel [v.SHARED] 
+	// kernel [v2.SHARED] 
 	// in order for it to work correctly NBODIES % NUM_THREADS_PER_BLOCK = 0 must be true
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
 		smComputeVelocitiesV1(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-		extern __shared__ float4 smPos[];
+		__shared__ float4 smPos[THREADS_PER_BLOCK];
 
 		float3 myPos = positions[tidx];
 		float3 myVelo = velocities[tidx];
@@ -229,13 +181,13 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel v.SHARED + LOOP UNROLL + rsqrtf()
+	// kernel [v4.SHARED + LOOP UNROLL + rsqrtf() + padding]
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
 		smComputeVelocitiesV3(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-		extern __shared__ float4 smPos[];
+		__shared__ float4 smPos[THREADS_PER_BLOCK];
 
 		float3 myPos = positions[tidx];
 		float3 myVelo = velocities[tidx];
@@ -250,7 +202,7 @@ namespace Device {
 			__syncthreads();
 			//compute interactions in our current sharedMemory
 
-			for (unsigned int i = 0; i < NUM_THREADS_PER_BLOCK; i++)
+			for (unsigned int i = 0; i < THREADS_PER_BLOCK; i++)
 			{
 				myVelo = smBodyBodyInteractionV2(myPos, smPos[i], myVelo);
 			}
@@ -267,38 +219,118 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// kernel v.SHARED  + LOOP UNROLL + rsqrtf() + TWO AT ONCE
+	// kernel [v1_1.NAIVE + TWO AT ONCE]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		ComputeVelocitiesTao(float3 *positions, float* masses, float3 *velocities) {
+		unsigned int tidA = blockIdx.x * blockDim.x * 2 + threadIdx.x * 2;
+		unsigned int tidB = tidA + 1;
+
+		float3 myPosA = positions[tidA];
+		float3 myPosB = positions[tidB];
+		float3 myVeloA = velocities[tidA];
+		float3 myVeloB = velocities[tidB];
+		for (unsigned int k = 0; k < NBODIES; ++k)
+		{
+			myVeloA = bodyBodyInteraction(myPosA, positions[k], masses[k], myVeloA);
+			myVeloB = bodyBodyInteraction(myPosB, positions[k], masses[k], myVeloB);
+		}
+		myPosA.x += myVeloA.x * DTGRAVITY;
+		myPosA.y += myVeloA.y * DTGRAVITY;
+		myPosA.z += myVeloA.z * DTGRAVITY;
+		myPosB.x += myVeloB.x * DTGRAVITY;
+		myPosB.y += myVeloB.y * DTGRAVITY;
+		myPosB.z += myVeloB.z * DTGRAVITY;
+
+		positions[tidA] = myPosA;
+		positions[tidB] = myPosB;
+		velocities[tidA] = myVeloA;
+		velocities[tidB] = myVeloB;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel [v1_2.NAIVE + X AT ONCE]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__global__
+		void
+		ComputeVelocitiesXao(float3 *positions, float* masses, float3 *velocities) {
+		unsigned int tids[BODIES_PER_THREAD];
+
+		tids[0] = blockIdx.x * blockDim.x * BODIES_PER_THREAD + threadIdx.x * BODIES_PER_THREAD;
+
+#pragma unroll BODIES_PER_THREAD
+		for (unsigned int i = 1; i < BODIES_PER_THREAD; ++i) {
+			tids[i] = tids[i - 1] + 1;
+		}
+
+		float3 myPos[BODIES_PER_THREAD];
+		float3 myVelo[BODIES_PER_THREAD];
+
+#pragma unroll BODIES_PER_THREAD
+		for (int i = 0; i < BODIES_PER_THREAD; ++i) {
+			myPos[i] = positions[tids[i]];
+		}
+
+#pragma unroll BODIES_PER_THREAD
+		for (int i = 0; i < BODIES_PER_THREAD; ++i) {
+			myVelo[i] = velocities[tids[i]];
+		}
+
+		for (unsigned int k = 0; k < NBODIES; ++k)
+		{
+
+#pragma unroll BODIES_PER_THREAD
+			for (int i = 0; i < BODIES_PER_THREAD; ++i) {
+				myVelo[i] = bodyBodyInteraction(myPos[i], positions[k], masses[k], myVelo[i]);
+			}
+		}
+
+#pragma unroll BODIES_PER_THREAD
+		for (int i = 0; i < BODIES_PER_THREAD; ++i) {
+			myPos[i].x += myVelo[i].x * DTGRAVITY;
+			myPos[i].y += myVelo[i].y * DTGRAVITY;
+			myPos[i].z += myVelo[i].z * DTGRAVITY;
+		}
+
+#pragma unroll BODIES_PER_THREAD
+		for (int i = 0; i < BODIES_PER_THREAD; ++i) {
+			positions[tids[i]] = myPos[i];
+		}
+
+#pragma unroll BODIES_PER_THREAD
+		for (int i = 0; i < BODIES_PER_THREAD; ++i) {
+			velocities[tids[i]] = myVelo[i];
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// kernel [v4_1.SHARED + LOOP UNROLL + rsqrtf() + TWO AT ONCE]
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__
 		void
 		smComputeVelocitiesV3tao(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidA = blockIdx.x * blockDim.x * 2 + threadIdx.x * 2;
 		unsigned int tidB = tidA + 1;
-		extern __shared__ float4 smPos[];
+		__shared__ float4 smPos[THREADS_PER_BLOCK];
 
 		float3 myPosA = positions[tidA];
 		float3 myPosB = positions[tidB];
 		float3 myVeloA = velocities[tidA];
 		float3 myVeloB = velocities[tidB];
 
-		for (int curTileIdx = 0; curTileIdx < gridDim.x; ++curTileIdx) {
-			int idxA = curTileIdx * blockDim.x * 2 + threadIdx.x * 2;
-			int idxB = idxA + 1;
+		for (int curTileIdx = 0; curTileIdx < gridDim.x*2; ++curTileIdx) {
+			int idx = curTileIdx * blockDim.x + threadIdx.x;
+			smPos[threadIdx.x].x = positions[idx].x;
+			smPos[threadIdx.x].y = positions[idx].y;
+			smPos[threadIdx.x].z = positions[idx].z;
+			smPos[threadIdx.x].w = masses[idx];
 
-			smPos[threadIdx.x].x = positions[idxA].x;
-			smPos[threadIdx.x].y = positions[idxA].y;
-			smPos[threadIdx.x].z = positions[idxA].z;
-			smPos[threadIdx.x].w = masses[idxA];
-			smPos[threadIdx.x + 1].x = positions[idxB].x;
-			smPos[threadIdx.x + 1].y = positions[idxB].y;
-			smPos[threadIdx.x + 1].z = positions[idxB].z;
-			smPos[threadIdx.x + 1].w = masses[idxB];
 			__syncthreads();
 			//compute interactions in our current sharedMemory
 
-			for (unsigned int i = 0; i < NUM_THREADS_PER_BLOCK*2; i++)
+			for (unsigned int i = 0; i < THREADS_PER_BLOCK; i++)
 			{
-				float4 curSmPos = smPos[i];
 				myVeloA = smBodyBodyInteractionV2(myPosA, smPos[i], myVeloA);
 				myVeloB = smBodyBodyInteractionV2(myPosB, smPos[i], myVeloB);
 			}
@@ -375,21 +407,21 @@ Cuda_Computing::initDevice() {
 
 	// determine thread layout
 	// num of threads on 1 block, thread layout per block
-	blockSize = dim3(NUM_THREADS_PER_BLOCK, 1, 1);
-	int numBlocks = N / NUM_THREADS_PER_BLOCK;
+	blockSize = dim3(THREADS_PER_BLOCK, 1, 1);
+	int numBlocks = N / THREADS_PER_BLOCK;
 	if (0 != N % blockSize.x) numBlocks++;
 	// number of blocks, block layout on grid
 	gridSize = dim3(numBlocks, 1, 1);
 
 	//determine thread layout when doing 2 body calculations per thread
-	int numBlocksTAO = N / (NUM_THREADS_PER_BLOCK * 2);
+	int numBlocksTAO = N / (THREADS_PER_BLOCK * 2);
 	if (0 != N % (blockSize.x * 2)) numBlocksTAO++;
 	// number of blocks, block layout on grid
 	gridSizeTAO = dim3(numBlocksTAO, 1, 1);
 
 	//determine thread layout when doing NUM_BODIES_PER_THREAD body calculations per thread
-	int numBlocksXAO = N / (NUM_THREADS_PER_BLOCK * NUM_BODIES_PER_THREAD);
-	if (0 != N % (blockSize.x * NUM_BODIES_PER_THREAD)) numBlocksXAO++;
+	int numBlocksXAO = N / (THREADS_PER_BLOCK * BODIES_PER_THREAD);
+	if (0 != N % (blockSize.x * BODIES_PER_THREAD)) numBlocksXAO++;
 	// number of blocks, block layout on grid
 	gridSizeXAO = dim3(numBlocksXAO, 1, 1);
 
@@ -399,7 +431,7 @@ Cuda_Computing::initDevice() {
 		<< "num blocks xao = " << gridSizeXAO.x << std::endl;
 
 	float dtG = G*DT;
-	int nTh = NUM_THREADS_PER_BLOCK;
+	int nTh = THREADS_PER_BLOCK;
 
 	errorCheckCuda(cudaMemcpyToSymbol(Device::EPSILON2, &EPS2, sizeof(float), 0, cudaMemcpyHostToDevice));
 	errorCheckCuda(cudaMemcpyToSymbol(Device::DTGRAVITY, &dtG, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -482,17 +514,17 @@ Cuda_Computing::computeNewPositions() {
 	//Device::ComputeVelocitiesTao << < gridSizeTAO, blockSize
 	//	>> > (Device::positions, Device::masses, Device::velocities);
 
-	Device::ComputeVelocitiesXao << < gridSizeXAO, blockSize
+	//Device::ComputeVelocitiesXao << < gridSizeXAO, blockSize
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+
+	//Device::smComputeVelocitiesV1 << < gridSize, blockSize
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+
+	//Device::smComputeVelocitiesV3 << < gridSize, blockSize
+	//	>> > (Device::positions, Device::masses, Device::velocities);
+
+	Device::smComputeVelocitiesV3tao << < gridSizeTAO, blockSize
 		>> > (Device::positions, Device::masses, Device::velocities);
-
-	//Device::smComputeVelocitiesV1 << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
-	//	>> > (Device::positions, Device::masses, Device::velocities);
-
-	//Device::smComputeVelocitiesV3 << < gridSize, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK
-	//	>> > (Device::positions, Device::masses, Device::velocities);
-
-	//Device::smComputeVelocitiesV3tao << < gridSizeTAO, blockSize, sizeof(float4)*NUM_THREADS_PER_BLOCK * 2
-	//	>> > (Device::positions, Device::masses, Device::velocities);
 
 	//errorCheckCuda(cudaPeekAtLastError());
 	errorCheckCuda(cudaDeviceSynchronize());
