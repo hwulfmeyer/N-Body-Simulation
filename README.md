@@ -36,7 +36,7 @@ Updating position & velocity for each body:
     
     dt = timespan;
     for each Body i {    
-      i.velocity += dt * i.force / i.mass;
+      i.velocity += i.force / i.mass;
       i.position += dt * i.velocity;
     }
 
