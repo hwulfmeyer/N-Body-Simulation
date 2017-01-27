@@ -10,8 +10,9 @@ The classical N-body problem simulates the evolution of a system of N bodies, wh
 Infomaterial:
 * http://http.developer.nvidia.com/GPUGems3/gpugems3_ch31.html
 * http://www.cs.cmu.edu/~scandal/alg/nbody.html
-* http://physics.princeton.edu/~fpretori/Nbody/intro.htm
-* http://www.cs.princeton.edu/courses/archive/spr15/cos126/assignments/nbody.html
+* http://docs.nvidia.com/cuda/cuda-c-best-practices-guide/
+* http://www.nvidia.com/content/GTC/documents/1055_GTC09.pdf
+* http://www.3dgep.com/opengl-interoperability-with-cuda/
 
 
 ### The Algorithm
@@ -36,7 +37,7 @@ Updating position & velocity for each body:
     
     dt = timespan;
     for each Body i {    
-      i.velocity += dt * i.force / i.mass;
+      i.velocity += i.force / i.mass;
       i.position += dt * i.velocity;
     }
 
