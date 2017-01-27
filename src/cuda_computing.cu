@@ -17,6 +17,11 @@ namespace Device {
 	__device__ __constant__
 		int NTHREADS;
 
+	struct float4pad {
+		float4 body;
+		float pad;
+	};
+
 	// array of masses
 	float *masses;
 	// array of velocities
@@ -98,6 +103,32 @@ namespace Device {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// physics calculations between bodies [v.SHARED MEMORY + RSQRTF()]
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	__device__
+		float3
+		smBodyBodyInteractionV2pad(float3 myPos, float4pad othPos, float3 velo) {
+		float3 dir;
+
+		dir.x = othPos.body.x - myPos.x;
+		dir.y = othPos.body.y - myPos.y;
+		dir.z = othPos.body.z - myPos.z;
+
+		float distSqr = dir.x*dir.x;
+		distSqr += dir.y*dir.y;
+		distSqr += dir.z*dir.z;
+		distSqr += EPSILON2;
+		float distSqrCubic = distSqr*distSqr*distSqr;
+		float partForce = rsqrtf(distSqrCubic);
+		partForce *= othPos.body.w;
+		// 6 FLOP
+		velo.x += dir.x * partForce;
+		velo.y += dir.y * partForce;
+		velo.z += dir.z * partForce;
+		return velo;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// naive kernel computing velocities [v1.NAIVE]
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	__global__ 
@@ -167,7 +198,7 @@ namespace Device {
 		void
 		smComputeVelocitiesV3(float3 *positions, float* masses, float3 *velocities) {
 		unsigned int tidx = blockIdx.x * blockDim.x + threadIdx.x;
-		__shared__ float4 smPos[THREADS_PER_BLOCK];
+		__shared__ float4pad smPos[THREADS_PER_BLOCK];
 
 		float3 myPos = positions[tidx];
 		float3 myVelo = velocities[tidx];
@@ -175,16 +206,16 @@ namespace Device {
 		// hence we have to do it gridDim.x = NBODIES/NUM_THREADS_PER_BLOCK times to get to each body
 		for (int curTileIdx = 0; curTileIdx < gridDim.x; curTileIdx++) {
 			int idx = curTileIdx * blockDim.x + threadIdx.x;
-			smPos[threadIdx.x].x = positions[idx].x;
-			smPos[threadIdx.x].y = positions[idx].y;
-			smPos[threadIdx.x].z = positions[idx].z;
-			smPos[threadIdx.x].w = masses[idx];
+			smPos[threadIdx.x].body.x = positions[idx].x;
+			smPos[threadIdx.x].body.y = positions[idx].y;
+			smPos[threadIdx.x].body.z = positions[idx].z;
+			smPos[threadIdx.x].body.w = masses[idx];
 			__syncthreads();
 			//compute interactions in our current sharedMemory
 
 			for (unsigned int i = 0; i < THREADS_PER_BLOCK; i++)
 			{
-				myVelo = smBodyBodyInteractionV2(myPos, smPos[i], myVelo);
+				myVelo = smBodyBodyInteractionV2pad(myPos, smPos[i], myVelo);
 			}
 			__syncthreads();
 		}
