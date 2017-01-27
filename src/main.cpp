@@ -35,8 +35,8 @@ starSystemFlat(std::vector<Body> &bodies);
 int
 main()
 {
-	unsigned const int winWidth = 1280;
-	unsigned const int winHeight = 768;
+	unsigned int winWidth = 1280;
+	unsigned int winHeight = 768;
 
 	// zoom factor
 	float zoomFactor = 0.05f;
@@ -98,8 +98,16 @@ main()
 
 		while (window.pollEvent(event))
 		{
-			if (event.type == sf::Event::Closed)
+			if (event.type == sf::Event::Closed) {
 				window.close();
+			}
+			if (event.type == sf::Event::Resized) {
+				// get the size of the window
+				sf::Vector2u size = window.getSize();
+				winWidth = size.x;
+				winHeight = size.y;
+				glViewport(0, 0, winWidth, winHeight);
+			}
 		}
 
 		//input stuff
