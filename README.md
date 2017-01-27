@@ -10,6 +10,7 @@ The classical N-body problem simulates the evolution of a system of N bodies, wh
 Infomaterial:
 * http://http.developer.nvidia.com/GPUGems3/gpugems3_ch31.html
 * http://www.cs.cmu.edu/~scandal/alg/nbody.html
+* https://www.bu.edu/pasi/files/2011/07/Lecture102.pdf
 * http://docs.nvidia.com/cuda/cuda-c-best-practices-guide/
 * http://www.nvidia.com/content/GTC/documents/1055_GTC09.pdf
 * http://www.3dgep.com/opengl-interoperability-with-cuda/
