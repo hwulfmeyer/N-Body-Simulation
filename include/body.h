@@ -1,8 +1,12 @@
 
-
 #ifndef _BODY_H_
 #define _BODY_H_
 
+#define _USE_MATH_DEFINES
+
+#include <vector>
+#include <math.h>
+#include <iostream>
 #include "glm/glm.hpp"
 
 static const float G = 6.67408e-11f;	// gravitational constant
@@ -23,6 +27,15 @@ public:
 	float mass;
 	glm::vec3 position;
 	glm::vec3 velocity;
+
+public:
+	static void testSystem(std::vector<Body> &bodies, int num);
+	static void starSystem1(std::vector<Body> &bodies, int num);
+	static void starSystem2(std::vector<Body> &bodies, int num);
+	static void starSystem3(std::vector<Body> &bodies, int num);
+	static void starSystem4(std::vector<Body> &bodies, int num);
+	static void starSystemFlat(std::vector<Body> &bodies, int num);
+	static void fillUp(std::vector<Body> &bodies);
 
 private:
 	// default constructor

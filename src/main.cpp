@@ -1,12 +1,11 @@
 
 
 
-#define _USE_MATH_DEFINES
+
 #define CUDAPARALLEL
 
 #include <iostream>
 #include <string>
-#include <math.h>
 #include "cuda_computing.cuh"
 #include "cpu_computing.h"
 
@@ -15,35 +14,51 @@
 
 
 void
-testSystem(std::vector<Body> &bodies);
+opengl_display(int kernel, int num);
 
 void
-starSystem1(std::vector<Body> &bodies);
-
-void
-starSystem2(std::vector<Body> &bodies);
-
-void
-starSystem3(std::vector<Body> &bodies);
-
-void
-starSystem4(std::vector<Body> &bodies);
-
-void
-starSystemFlat(std::vector<Body> &bodies);
+benchmark(int kernel, int num);
 
 int
-main()
+main(int argc, char** argv)
+{
+	if (argc == 4) {
+		std::string cmd = argv[1];
+		int kernel = std::stoi(argv[2]);
+		int num = std::stoi(argv[3]);
+
+		if (cmd == "bench") {
+			std::cout << "Running benchmark! This may take a while! Sit back and relax!" << std::endl;
+			benchmark(kernel, num);
+		}
+		else if (cmd == "disp") {
+			opengl_display(kernel, num);
+		}
+	}
+	else {
+		std::cout << "Not enough input parameters defined!" << std::endl;
+		std::cout << "Benchmarking parameters: 'bench k n'" << std::endl;
+		std::cout << "\t k = which kernel to use, if k = 99 it benchmarks all" << std::endl;
+		std::cout << "\t n = number of bodies, best use a number that is a power of 2" << std::endl;
+		std::cout << "\t Benchmarks the program with n number of bodies." << std::endl;
+		std::cout << "Displaying parameters: 'disp k n'" << std::endl;
+		std::cout << "\t k = which kernel to use" << std::endl;
+		std::cout << "\t n = number of bodies, best use a number that is a power of 2" << std::endl;
+		std::cout << "\t Displaying the n bodies in OpenGL." << std::endl;
+	}
+
+	return 0;
+}
+
+
+void opengl_display(int kernel, int num)
 {
 	unsigned int winWidth = 1280;
 	unsigned int winHeight = 768;
-
 	// zoom factor
 	float zoomFactor = 0.05f;
 	// time between frames
 	float dt = 0;
-	// time keeper for updating
-	float timercopying = 0;
 	// translation
 	float xTranslation = 10;
 	float yTranslation = 10;
@@ -77,7 +92,8 @@ main()
 
 	//setup cuda etc.
 	std::vector<Body> bodies;
-	starSystemFlat(bodies); /// system
+	Body::starSystemFlat(bodies, num); /// system
+
 #ifdef CUDAPARALLEL
 	Cuda_Computing cuda_computer(bodies);
 	cuda_computer.initDevice();
@@ -124,7 +140,7 @@ main()
 				xTranslation += dt * 200;
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
 				xTranslation -= dt * 200;
-			if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
 				window.close();
 			if (!isComputing && sf::Keyboard::isKeyPressed(sf::Keyboard::B))
 				isComputing = true;
@@ -143,7 +159,7 @@ main()
 		glEnableClientState(GL_VERTEX_ARRAY);
 
 #ifdef CUDAPARALLEL
-		glVertexPointer(3, GL_FLOAT, sizeof(float3),0);
+		glVertexPointer(3, GL_FLOAT, sizeof(float3), 0);
 #else
 		glVertexPointer(3, GL_FLOAT, 0, positions);
 #endif
@@ -161,7 +177,7 @@ main()
 		if (isComputing) {
 			/// nbody calculations
 #ifdef CUDAPARALLEL
-			kernelTime += cuda_computer.computeNewPositions();
+			kernelTime += cuda_computer.computeNewPositions(kernel);
 #else
 			kernelTime += cpu_computer.compute_forces(DT);
 #endif
@@ -180,197 +196,44 @@ main()
 	}
 
 	std::cerr << "Average FPS: " << avgFPS << "  ::  gFLOPs from fps: " << avgFPS * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
-	std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs from time: " << 1000/(kernelTime/frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
-	return 0;
+	std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs from time: " << 1000 / (kernelTime / frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
 }
 
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// different body systems for testing
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-testSystem(std::vector<Body> &bodies)
+void benchmark(int kernel, int num)
 {
-	unsigned const int numOneSideParticles = 13;
 
-	Body starBody(1e10, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
-	float distance = 300;
-	// fill vector body with bodies
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(
-					0,
-					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(0, 0, 0)
-				);
-				bodies.push_back(curBody1);
-				Body curBody2(
-					0,
-					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(0, 0, 0)
-				);
-				bodies.push_back(curBody2);
+	sf::Window window(sf::VideoMode(30, 30), "N-Body Simulation");
+	glewExperimental = GL_TRUE;
+	glewInit();
+
+	int frameRuns = 40;
+	float kernelTime = 0;
+
+	std::vector<Body> bodies;
+	Body::starSystemFlat(bodies, num); /// system
+
+	Cuda_Computing cuda_computer(bodies);
+	cuda_computer.initDevice();
+	cuda_computer.initVertexBuffer();
+	const size_t sizeBodies = cuda_computer.getSize();
+	
+	if (kernel == 99) {
+		for (int k = 0; k <= 6; ++k) {
+			for (int i = 0; i < frameRuns; ++i) {
+				kernelTime += cuda_computer.computeNewPositions(k);
 			}
+			std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs: " << 1000 / (kernelTime / frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
+			kernelTime = 0;
 		}
 	}
-}
-
-void
-starSystem1(std::vector<Body> &bodies)
-{
-	unsigned const int numOneSideParticles = 10;
-
-	Body starBody(9e18f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
-	float distance = 300;
-	// fill vector body with bodies
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(
-					2e10,
-					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(2e14, 0, 0)
-				);
-				bodies.push_back(curBody1);
-				Body curBody2(
-					2e10,
-					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(-2e14, 0, 0)
-				);
-				bodies.push_back(curBody2);
-			}
+	else {
+		for (int i = 0; i < frameRuns; ++i) {
+			kernelTime += cuda_computer.computeNewPositions(kernel);
 		}
-	}
-}
-
-void
-starSystem2(std::vector<Body>& bodies)
-{
-	unsigned const int numOneSideParticles = 10;
-
-	Body starBody(1.2e19f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
-	float distance = 300;
-	// fill vector body with bodies
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(
-					2e10,
-					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(2e14, 0, 0)
-				);
-				bodies.push_back(curBody1);
-				Body curBody2(
-					2e10,
-					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(-2e14, 0, 0)
-				);
-				bodies.push_back(curBody2);
-				Body curBody3(
-					2e10,
-					starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(0, -2e14, 0)
-				);
-				bodies.push_back(curBody3);
-				Body curBody4(
-					2e10,
-					starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(0, 2e14, 0)
-				);
-				bodies.push_back(curBody4);
-			}
-		}
-	}
-}
-
-void
-starSystem3(std::vector<Body>& bodies)
-{
-	unsigned const int numOneSideParticles = 20;
-	float speed = 2e15f;
-	Body starBody(6e19f, glm::vec3(500, 2000, 1000), glm::vec3(0, 0, 0));
-	bodies.push_back(starBody);
-	float distance = 300;
-	// fill vector body with bodies
-	for (int x = 0; x < numOneSideParticles; ++x) {
-		for (int y = 0; y < numOneSideParticles; ++y) {
-			for (int z = 0; z < numOneSideParticles; ++z) {
-				Body curBody1(
-					2e10,
-					starBody.position + glm::vec3(0, 2000, 0) + glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(speed, 0, 0)
-				);
-				bodies.push_back(curBody1);
-				Body curBody2(
-					2e10,
-					starBody.position - glm::vec3(0, 2000, 0) - glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(-speed, 0, 0));
-				bodies.push_back(curBody2);
-				Body curBody3(
-					2e10,
-					starBody.position + glm::vec3(2000, numOneSideParticles*-distance, 0) + glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(0, -speed, 0)
-				);
-				bodies.push_back(curBody3);
-				Body curBody4(
-					2e10,
-					starBody.position - glm::vec3(2000, numOneSideParticles*-distance, 0) - glm::vec3(x * distance, y * distance, z * distance),
-					glm::vec3(0, speed, 0)
-				);
-				bodies.push_back(curBody4);
-			}
-		}
+		std::cerr << "Average Kernel time: " << kernelTime / frameRuns << "  ::  gFLOPs: " << 1000 / (kernelTime / frameRuns) * sizeBodies * sizeBodies * 19 / 1e9f << std::endl;
+		kernelTime = 0;
 	}
 
 
-}
-
-void
-starSystem4(std::vector<Body>& bodies)
-{
-
-	float radius = 2e5f;
-	float angle = 0.0f;
-	float angle_stepsize = 0.075f;
-	int bodies_per_angle = 25;
-
-	// go through all angles from 0 to 2 * PI radians
-	while (angle < 2 * M_PI)
-	{
-		// calculate x, y from a vector with known length and angle
-		float x = radius * cos(angle);
-		float y = radius * sin(angle);
-
-		for (int i = 1; i <= bodies_per_angle; ++i) {
-			Body body(2e16f, glm::vec3(x*i / 70, y*i / 70, 0), glm::vec3(0, 0, 0));
-			bodies.push_back(body);
-		}
-		angle += angle_stepsize;
-	}
-}
-
-void 
-starSystemFlat(std::vector<Body>& bodies)
-{
-	unsigned const int numParticles = 65536/4; //131072;
-	// fill vector body with bodies
-	for (int i=0,x=0,y=0; i < numParticles; ++i, ++x) {
-		if (x > 768) {
-			++y;
-			x = 0;
-		}
-		glm::vec3 pos = glm::vec3(x * 30, y * 100, 0) + glm::vec3(400,400,0);
-
-		Body curBody1(
-			2e17f,
-			pos,
-			glm::vec3(0, 0, 0)
-		);
-		bodies.push_back(curBody1);
-	}
 }
 

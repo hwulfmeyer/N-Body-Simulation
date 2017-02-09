@@ -44,7 +44,7 @@ public:
 
 	bool initVertexBuffer();
 
-	float computeNewPositions();
+	float computeNewPositions(int i);
 
 	size_t getSize() const;
 
