@@ -74,7 +74,7 @@ UI: http://anttweakbar.sourceforge.net/doc/
 2. porting to multithreaded CPU         [DONE]
 3. naive algorithm on CUDA              [DONE]
 4. utilize OpenGL & Cuda inoperability  [DONE]
-5. CUDA performance optimizations       [TODO]
+5. CUDA performance optimizations       [DONE]
 6. create better & 3D particles/world   [TODO]
 7. integrate AntTweakBar                [TODO]
 
